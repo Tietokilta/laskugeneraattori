@@ -98,6 +98,7 @@ impl DatabaseConnection {
 
         Ok(created_invoice.into_populated(rows, attachments))
     }
+
     pub async fn list_invoices(&mut self) -> Result<Vec<PopulatedInvoice>, Error> {
         use crate::schema::invoices;
         let invoices = invoices::table
@@ -121,5 +122,20 @@ impl DatabaseConnection {
             .zip(invoices)
             .map(|((rows, attachments), invoice)| invoice.into_populated(rows, attachments))
             .collect::<Vec<PopulatedInvoice>>())
+    }
+
+    pub async fn get_invoice(&mut self, invoice_id: i32) -> Result<PopulatedInvoice, Error> {
+        use crate::schema::invoices::dsl::invoices;
+
+        let invoice = invoices
+            .find(invoice_id)
+            .first::<Invoice>(&mut self.0)
+            .await?;
+
+        let attachments = Attachment::belonging_to(&invoice).load(&mut self.0).await?;
+
+        let rows = InvoiceRow::belonging_to(&invoice).load(&mut self.0).await?;
+
+        Ok(invoice.into_populated(rows, attachments))
     }
 }

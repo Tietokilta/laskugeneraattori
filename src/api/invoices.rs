@@ -96,6 +96,7 @@ pub struct PopulatedInvoice {
     pub rows: Vec<crate::models::InvoiceRow>,
     pub attachments: Vec<crate::models::Attachment>,
 }
+
 impl PopulatedInvoice {
     pub fn new(invoice: Invoice, rows: Vec<InvoiceRow>, attachments: Vec<Attachment>) -> Self {
         Self {
