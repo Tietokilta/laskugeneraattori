@@ -130,7 +130,8 @@ impl DatabaseConnection {
         let invoice = invoices
             .find(invoice_id)
             .first::<Invoice>(&mut self.0)
-            .await?;
+            .await
+            .map_err(|_| Error::InvoiceNotFound)?;
 
         let attachments = Attachment::belonging_to(&invoice).load(&mut self.0).await?;
 
