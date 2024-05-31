@@ -7,6 +7,9 @@ mod database;
 mod error;
 mod models;
 
+#[cfg(feature = "pdfgen")]
+mod pdfgen;
+
 #[rustfmt::skip]
 mod schema;
 

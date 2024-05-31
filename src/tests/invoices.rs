@@ -52,12 +52,15 @@ async fn create() {
         attachments: vec![],
         recipient_name: "Velkoja".into(),
         recipient_email: "velkoja@velat.com".into(),
+        subject: "Pelikonsoleita".into(),
+        description: "Ostettiin pelikonsoleita ku ei ollu tarpeeks".into(),
         address: NewAddress {
             street: "Otakaari 18A 69".into(),
             city: "Espoo".into(),
             zip: "02jotain".into(),
         },
         bank_account_number: "ei ole".into(),
+        phone_number: "+358401234567".into(),
     };
 
     let body = MultipartForm::new().add_text("data", serde_json::to_string(&body).unwrap());
@@ -90,6 +93,9 @@ async fn create_list_all() {
             zip: "02jotain".into(),
         },
         bank_account_number: "ei ole".into(),
+        phone_number: "+358401234567".into(),
+        subject: "Pelikonsoleita".into(),
+        description: "Ostettiin pelikonsoleita ku ei ollu tarpeeks".into(),
         rows: vec![
             CreateInvoiceRow {
                 product: String::from("pleikkari"),

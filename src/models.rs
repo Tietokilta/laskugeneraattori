@@ -37,7 +37,8 @@ pub enum InvoiceStatus {
     Paid,
     Cancelled,
 }
-#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
+
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug, Serialize, Deserialize)]
 #[diesel(table_name = addresses)]
 pub struct Address {
     pub id: i32,
@@ -48,6 +49,7 @@ pub struct Address {
     /// The zipcode can be at most 128 characters (:D)
     pub zip: String,
 }
+
 #[derive(Insertable, Debug, Clone, Serialize, Deserialize, Validate)]
 #[diesel(table_name=addresses)]
 pub struct NewAddress {
@@ -58,6 +60,7 @@ pub struct NewAddress {
     #[garde(byte_length(max = 128))]
     pub zip: String,
 }
+
 /// The invoice model as stored in the database
 #[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
 #[diesel(belongs_to(Address))]
@@ -75,16 +78,27 @@ pub struct Invoice {
     /// A back account number can be at most 128 characters
     pub bank_account_number: String,
     pub address_id: i32,
+    /// The subject of the invoice, has to be between 1 and 128 characters long
+    pub subject: String,
+    /// The description of the invoice, containing e.g. reasons for the purchase
+    /// can be at most 512 characters
+    pub description: String,
+    /// invoice recipient's phone number. Can be at most 32 characters.
+    /// Must be a valid phone number
+    pub phone_number: String,
 }
+
 impl Invoice {
     pub fn into_populated(
         self,
+        address: Address,
         rows: Vec<InvoiceRow>,
         attachments: Vec<Attachment>,
     ) -> PopulatedInvoice {
-        PopulatedInvoice::new(self, rows, attachments)
+        PopulatedInvoice::new(self, address, rows, attachments)
     }
 }
+
 #[derive(Insertable)]
 #[diesel(table_name = invoices)]
 pub struct NewInvoice {
@@ -92,6 +106,9 @@ pub struct NewInvoice {
     pub recipient_name: String,
     pub recipient_email: String,
     pub bank_account_number: String,
+    pub subject: String,
+    pub description: String,
+    pub phone_number: String,
 }
 
 /// A single row of an invoice

@@ -3,10 +3,20 @@ use tower_http::{limit::RequestBodyLimitLayer, trace::TraceLayer};
 
 pub mod invoices;
 
+#[cfg(feature = "pdfgen")]
+pub mod pdf;
+
 pub fn app() -> Router<crate::database::State> {
-    Router::new()
+    let mut router = Router::new()
         .route("/health", get(health))
-        .route("/invoices", get(invoices::list_all).post(invoices::create))
+        .route("/invoices", get(invoices::list_all).post(invoices::create));
+
+    #[cfg(feature = "pdfgen")]
+    {
+        router = router.route("/invoices/:id/pdf", get(pdf::pdf));
+    }
+
+    router
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(

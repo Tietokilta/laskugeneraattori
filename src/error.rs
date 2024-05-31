@@ -25,6 +25,11 @@ pub enum Error {
     JsonError(#[from] serde_json::Error),
     #[error("Internal server error")]
     InternalServerError(#[from] std::io::Error),
+    #[error("Invoice not found")]
+    InvoiceNotFound,
+    #[cfg(feature = "pdfgen")]
+    #[error("Typst error")]
+    TypstError,
 }
 
 impl IntoResponse for Error {
@@ -45,6 +50,9 @@ impl IntoResponse for Error {
             | Error::MultipartError(_)
             | Error::MultipartRejection(_)
             | Error::JsonRejection(_) => StatusCode::BAD_REQUEST,
+            Error::InvoiceNotFound => StatusCode::NOT_FOUND,
+            #[cfg(feature = "pdfgen")]
+            Error::TypstError => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         (
