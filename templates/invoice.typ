@@ -4,7 +4,7 @@
   ],
   footer: [
     Laskut hyväksytään Tietokillan hallituksen kokouksissa.
-    Ongelmatapauksissa ota yhteyttä rahastonhoitajaan: rahastonhoitaja\@tietokilta.fi
+    Ongelmatapauksissa ota yhteyttä rahastonhoitajaan: #link("mailto:rahastonhoitaja@tietokilta.fi").
     Tarkemmat yhteystiedot löydät killan sivuilta.
   ],
 )
@@ -49,7 +49,7 @@
 *Laskuttajan nimi*: #data.recipient_name \
 *Katuosoite*: #data.address.street \
 *Postinumero ja -toimipaikka*: #data.address.zip #data.address.city \
-*Puhelin*: puuttuu \
+*Puhelin*: #link("tel:" + data.phone_number) \
 *E-mail*: #link("mailto:" + data.recipient_email) \
 
 #colbreak()
@@ -60,8 +60,8 @@
 
 == Tietokilta
 
-*Aihe*: puuttuu \
-*Perustelut*: puuttuu \
+*Aihe*: #data.subject \
+*Perustelut*: #data.description \
 
 === Erittely
 #let rows = data.rows.map(it => ([#it.quantity #it.unit], [#it.product],
@@ -74,9 +74,7 @@
 
 *IBAN-tilinumero*: #data.bank_account_number \
 
-=== Muuta:
-
-==== LIITTEET:
+=== LIITTEET:
 #data.attachments.map(a => a.filename).join(",")
 
 #for file in data.attachments {

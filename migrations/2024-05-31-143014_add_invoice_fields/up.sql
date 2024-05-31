@@ -1,0 +1,7 @@
+-- Your SQL goes here
+ALTER TABLE invoices
+ADD COLUMN subject VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE invoices
+ADD COLUMN description VARCHAR(512) NOT NULL DEFAULT '';
+ALTER TABLE invoices
+ADD COLUMN phone_number VARCHAR(32) NOT NULL DEFAULT '';

@@ -78,6 +78,14 @@ pub struct Invoice {
     /// A back account number can be at most 128 characters
     pub bank_account_number: String,
     pub address_id: i32,
+    /// The subject of the invoice, has to be between 1 and 128 characters long
+    pub subject: String,
+    /// The description of the invoice, containing e.g. reasons for the purchase
+    /// can be at most 512 characters
+    pub description: String,
+    /// invoice recipient's phone number. Can be at most 32 characters.
+    /// Must be a valid phone number
+    pub phone_number: String,
 }
 
 impl Invoice {
@@ -98,6 +106,9 @@ pub struct NewInvoice {
     pub recipient_name: String,
     pub recipient_email: String,
     pub bank_account_number: String,
+    pub subject: String,
+    pub description: String,
+    pub phone_number: String,
 }
 
 /// A single row of an invoice

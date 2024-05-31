@@ -44,6 +44,9 @@ impl DatabaseConnection {
             address_id: address.id,
             recipient_name: invoice.recipient_name,
             recipient_email: invoice.recipient_email,
+            subject: invoice.subject,
+            description: invoice.description,
+            phone_number: invoice.phone_number,
             bank_account_number: invoice.bank_account_number,
         };
 

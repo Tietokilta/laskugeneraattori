@@ -42,6 +42,12 @@ pub struct CreateInvoice {
     // TODO: maybe validate with https://crates.io/crates/iban_validate/
     #[garde(byte_length(max = 128))]
     pub bank_account_number: String,
+    #[garde(byte_length(min = 1, max = 128))]
+    pub subject: String,
+    #[garde(byte_length(max = 512))]
+    pub description: String,
+    #[garde(phone_number, byte_length(max = 32))]
+    pub phone_number: String,
     /// The rows of the invoice
     #[garde(length(min = 1), dive)]
     pub rows: Vec<CreateInvoiceRow>,
@@ -93,6 +99,9 @@ pub struct PopulatedInvoice {
     pub recipient_name: String,
     pub recipient_email: String,
     pub bank_account_number: String,
+    pub phone_number: String,
+    pub subject: String,
+    pub description: String,
     pub address: Address,
     pub rows: Vec<InvoiceRow>,
     pub attachments: Vec<Attachment>,
@@ -111,6 +120,9 @@ impl PopulatedInvoice {
             creation_time: invoice.creation_time,
             recipient_name: invoice.recipient_name,
             recipient_email: invoice.recipient_email,
+            phone_number: invoice.phone_number,
+            subject: invoice.subject,
+            description: invoice.description,
             address,
             bank_account_number: invoice.bank_account_number,
             rows,
