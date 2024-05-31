@@ -47,8 +47,8 @@
 
 #columns(2)[
 *Laskuttajan nimi*: #data.recipient_name \
-*Katuosoite*: puuttuu \
-*Postinumero ja -toimipaikka*: puuttuu \
+*Katuosoite*: #data.address.street \
+*Postinumero ja -toimipaikka*: #data.address.zip #data.address.city \
 *Puhelin*: puuttuu \
 *E-mail*: #link("mailto:" + data.recipient_email) \
 

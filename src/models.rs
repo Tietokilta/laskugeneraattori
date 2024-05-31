@@ -37,7 +37,8 @@ pub enum InvoiceStatus {
     Paid,
     Cancelled,
 }
-#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
+
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug, Serialize, Deserialize)]
 #[diesel(table_name = addresses)]
 pub struct Address {
     pub id: i32,
@@ -48,6 +49,7 @@ pub struct Address {
     /// The zipcode can be at most 128 characters (:D)
     pub zip: String,
 }
+
 #[derive(Insertable, Debug, Clone, Serialize, Deserialize, Validate)]
 #[diesel(table_name=addresses)]
 pub struct NewAddress {
@@ -58,6 +60,7 @@ pub struct NewAddress {
     #[garde(byte_length(max = 128))]
     pub zip: String,
 }
+
 /// The invoice model as stored in the database
 #[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
 #[diesel(belongs_to(Address))]
@@ -76,15 +79,18 @@ pub struct Invoice {
     pub bank_account_number: String,
     pub address_id: i32,
 }
+
 impl Invoice {
     pub fn into_populated(
         self,
+        address: Address,
         rows: Vec<InvoiceRow>,
         attachments: Vec<Attachment>,
     ) -> PopulatedInvoice {
-        PopulatedInvoice::new(self, rows, attachments)
+        PopulatedInvoice::new(self, address, rows, attachments)
     }
 }
+
 #[derive(Insertable)]
 #[diesel(table_name = invoices)]
 pub struct NewInvoice {

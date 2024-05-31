@@ -1,6 +1,6 @@
 use crate::database::DatabaseConnection;
 use crate::error::Error;
-use crate::models::{Attachment, Invoice, InvoiceRow};
+use crate::models::{Address, Attachment, Invoice, InvoiceRow};
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
 use axum_typed_multipart::{
     FieldData, FieldMetadata, TryFromChunks, TryFromMultipart, TypedMultipart, TypedMultipartError,
@@ -93,18 +93,25 @@ pub struct PopulatedInvoice {
     pub recipient_name: String,
     pub recipient_email: String,
     pub bank_account_number: String,
-    pub rows: Vec<crate::models::InvoiceRow>,
-    pub attachments: Vec<crate::models::Attachment>,
+    pub address: Address,
+    pub rows: Vec<InvoiceRow>,
+    pub attachments: Vec<Attachment>,
 }
 
 impl PopulatedInvoice {
-    pub fn new(invoice: Invoice, rows: Vec<InvoiceRow>, attachments: Vec<Attachment>) -> Self {
+    pub fn new(
+        invoice: Invoice,
+        address: Address,
+        rows: Vec<InvoiceRow>,
+        attachments: Vec<Attachment>,
+    ) -> Self {
         Self {
             id: invoice.id,
             status: invoice.status,
             creation_time: invoice.creation_time,
             recipient_name: invoice.recipient_name,
             recipient_email: invoice.recipient_email,
+            address,
             bank_account_number: invoice.bank_account_number,
             rows,
             attachments,
