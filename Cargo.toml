@@ -16,7 +16,7 @@ system_fonts = ["dep:fontdb"]
 axum = { version = "0.7.4", features = ["macros", "multipart"] }
 axum-valid = { version = "0.14.0", features = [
     "basic",
-    "garde",
+    "full_garde",
     "typed_multipart",
 ], default-features = false }
 axum_typed_multipart = "0.11.0"
