@@ -1,17 +1,22 @@
 use std::sync::LazyLock;
 
 use crate::error::Error;
+#[cfg(feature = "email")]
 use crate::mailgun::MailgunClient;
-use axum::{async_trait, body::Bytes, http::StatusCode, Json};
+
+use axum::{async_trait, body::Bytes, http::StatusCode};
 use axum_typed_multipart::{
     FieldData, FieldMetadata, TryFromChunks, TryFromMultipart, TypedMultipart, TypedMultipartError,
 };
+
 use axum_valid::Garde;
 use futures::stream::Stream;
 use garde::Validate;
 use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
+
+use typst::model::Document;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
@@ -129,19 +134,61 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     })
 }
 
-pub async fn create(
+#[cfg(feature = "email")]
+pub async fn create_email(
     client: MailgunClient,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
-) -> Result<(StatusCode, Json<Invoice>), Error> {
+) -> Result<(StatusCode, axum::Json<Invoice>), Error> {
     let orig = multipart.data.clone();
-    multipart.data.attachments = Result::from_iter(
+    multipart.data.attachments =
+        Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
+
+    let document: Document = multipart.data.to_owned().try_into()?;
+    let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
+
+    let mut pdfs = vec![pdf];
+    pdfs.extend_from_slice(
         multipart
+            .data
             .attachments
             .into_iter()
-            .map(try_handle_file)
-            .collect::<Vec<_>>(),
-    )?;
+            .map(|a| a.bytes)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
 
-    client.send_mail(multipart.data).await?;
+    let pdf = crate::merge::merge_pdf(pdfs)?;
+
+    client.send_mail(&orig, pdf).await?;
     Ok((StatusCode::CREATED, axum::Json(orig)))
+}
+
+#[cfg(not(feature = "email"))]
+pub async fn create(
+    Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
+) -> Result<axum::response::Response, Error> {
+    multipart.data.attachments =
+        Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
+
+    let document: Document = multipart.data.to_owned().try_into()?;
+    let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
+
+    let mut pdfs = vec![pdf];
+    pdfs.extend_from_slice(
+        multipart
+            .data
+            .attachments
+            .into_iter()
+            .map(|a| a.bytes)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+
+    let pdf = crate::merge::merge_pdf(pdfs)?;
+
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::CREATED)
+        .header("Content-Type", "application/pdf")
+        .body(Bytes::from(pdf).into())
+        .unwrap())
 }

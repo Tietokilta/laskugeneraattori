@@ -1,26 +1,9 @@
 use super::MailgunClient;
 use crate::api::invoices::Invoice;
 use crate::error::Error;
-use crate::merge::merge_pdf;
-use typst::model::Document;
 
 impl MailgunClient {
-    pub async fn send_mail(self, invoice: Invoice) -> Result<(), Error> {
-        let document: Document = invoice.to_owned().try_into()?;
-        let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
-
-        let mut pdfs = vec![pdf];
-        pdfs.extend_from_slice(
-            invoice
-                .attachments
-                .into_iter()
-                .map(|a| a.bytes)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-
-        let pdf = merge_pdf(pdfs)?;
-
+    pub async fn send_mail(self, invoice: &Invoice, pdf: Vec<u8>) -> Result<(), Error> {
         let invoice_recipient = format!("{} <{}>", invoice.recipient_name, invoice.recipient_email);
         let form = reqwest::multipart::Form::new()
             .text("from", self.from)

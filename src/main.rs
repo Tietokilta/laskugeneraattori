@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 
 mod api;
 mod error;
+#[cfg(feature = "email")]
 mod mailgun;
 mod merge;
 mod state;
@@ -18,6 +19,7 @@ mod tests;
 #[macro_use]
 extern crate tracing;
 
+#[cfg(feature = "email")]
 #[derive(Parser, Clone, Debug)]
 struct MailgunConfig {
     /// Url used by mailgun
@@ -40,6 +42,7 @@ struct MailgunConfig {
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None)]
 struct LaskugenConfig {
+    #[cfg(feature = "email")]
     #[clap(flatten)]
     mailgun: MailgunConfig,
     /// The listen port for the HTTP server

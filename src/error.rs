@@ -8,6 +8,7 @@ use serde_derive::Serialize;
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[cfg(feature = "email")]
     #[error("Reqwest error {0}")]
     ReqwestError(#[from] reqwest::Error),
     #[error("Error while parsing multipart form")]
@@ -38,9 +39,9 @@ impl IntoResponse for Error {
         error!(%self);
 
         let status = match self {
-            Error::InternalServerError(_) | Error::ReqwestError(_) | Error::TypstError => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            Error::InternalServerError(_) | Error::TypstError => StatusCode::INTERNAL_SERVER_ERROR,
+            #[cfg(feature = "email")]
+            Error::ReqwestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::JsonError(_)
             | Error::MissingFilename
             | Error::MultipartError(_)
