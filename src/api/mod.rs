@@ -38,7 +38,13 @@ pub fn app() -> Router<crate::state::State> {
 
     Router::new()
         .route("/health", get(health))
-        .route("/invoices", post(invoices::create))
+        .route(
+            "/invoices",
+            #[cfg(feature = "email")]
+            post(invoices::create_email),
+            #[cfg(not(feature = "email"))]
+            post(invoices::create),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
         .layer(DefaultBodyLimit::disable())
