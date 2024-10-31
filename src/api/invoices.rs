@@ -167,6 +167,10 @@ pub async fn create_email(
 pub async fn create(
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<axum::response::Response, Error> {
+    use tempfile::NamedTempFile;
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
+
     multipart.data.attachments =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
 
@@ -185,6 +189,13 @@ pub async fn create(
     );
 
     let pdf = crate::merge::merge_pdf(pdfs)?;
+
+    let tmp = NamedTempFile::with_suffix(".pdf")?;
+    let (file, path) = tmp.keep().unwrap();
+    let mut file = File::from_std(file);
+    file.write_all(&pdf).await?;
+
+    info!("Wrote invoice to {:?}", path);
 
     Ok(axum::response::Response::builder()
         .status(StatusCode::CREATED)

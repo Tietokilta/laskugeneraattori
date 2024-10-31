@@ -35,6 +35,7 @@ reqwest = { version = "0.12.5", default-features = false, features = ["multipart
 serde = "1.0.195"
 serde_derive = "1.0.195"
 serde_json = "1.0.111"
+tempfile = "3.13.0"
 thiserror = "1.0.56"
 time = { version = "0.3.36" }
 tokio = { version = "1.35.1", features = ["full"] }
