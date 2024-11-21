@@ -89,7 +89,16 @@
               inherit toolchain;
             };
 
-            devcontainer.enable = true;
+            devcontainer = {
+              enable = true;
+              settings = {
+                updateContentCommand = "";
+                customizations.vscode.extensions = [
+                  "mkhl.direnv"
+                  "rust-lang.rust-analyzer"
+                ];
+              };
+            };
           }
         ];
       };
