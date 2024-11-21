@@ -1,3 +1,7 @@
 /target
 .env
 *.json
+
+.direnv
+.devenv
+result
