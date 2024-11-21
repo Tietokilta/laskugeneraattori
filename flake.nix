@@ -54,6 +54,8 @@
 
         strictDeps = true;
 
+        GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
+
         buildInputs = lib.optionals pkgs.stdenv.isDarwin [pkgs.libiconv];
 
         doCheck = false;
@@ -69,7 +71,13 @@
         inherit laskugeneraattori;
       };
 
-      packages.default = laskugeneraattori;
+      packages = {
+        default = laskugeneraattori;
+        docker = pkgs.dockerTools.buildLayeredImage {
+          name = "laskugeneraattori";
+          config.Cmd = ["${laskugeneraattori}/bin/laskugeneraattori"];
+        };
+      };
 
       devShells.default = devenv.lib.mkShell {
         inherit inputs pkgs;
