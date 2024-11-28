@@ -17,90 +17,95 @@
     extra-substituters = "https://devenv.cachix.org";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    crane,
-    flake-utils,
-    fenix,
-    devenv,
-    ...
-  } @ inputs:
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [fenix.overlays.default];
-      };
+  outputs =
+    {
+      self,
+      nixpkgs,
+      crane,
+      flake-utils,
+      fenix,
+      devenv,
+      ...
+    }@inputs:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ fenix.overlays.default ];
+        };
 
-      toolchain = fenix.packages.${system}.fromToolchainFile {
-        file = ./rust-toolchain;
-        sha256 = "sha256-yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
-      };
-
-      lib = pkgs.lib;
-
-      craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
-
-      unfilteredRoot = ./.;
-
-      commonArgs = {
-        src = lib.fileset.toSource {
-          root = unfilteredRoot;
-          fileset = lib.fileset.unions [
-            (craneLib.fileset.commonCargoSources unfilteredRoot)
-            (lib.fileset.maybeMissing ./templates)
+        toolchain =
+          with fenix.packages.${system};
+          combine [
+            stable.rustc
+            stable.cargo
+            targets.x86_64-unknown-linux-musl.stable.rust-std
           ];
+
+        lib = pkgs.lib;
+
+        craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+
+        unfilteredRoot = ./.;
+
+        commonArgs = {
+          src = lib.fileset.toSource {
+            root = unfilteredRoot;
+            fileset = lib.fileset.unions [
+              (craneLib.fileset.commonCargoSources unfilteredRoot)
+              (lib.fileset.maybeMissing ./templates)
+            ];
+          };
+
+          strictDeps = true;
+
+          GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
+
+          CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+
+          buildInputs = lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
+          doCheck = false;
         };
 
-        strictDeps = true;
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
-
-        buildInputs = lib.optionals pkgs.stdenv.isDarwin [pkgs.libiconv];
-
-        doCheck = false;
-      };
-
-      cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-      laskugeneraattori = craneLib.buildPackage (
-        commonArgs // {inherit cargoArtifacts;}
-      );
-    in {
-      checks = {
-        inherit laskugeneraattori;
-      };
-
-      packages = {
-        default = laskugeneraattori;
-        docker = pkgs.dockerTools.buildLayeredImage {
-          name = "laskugeneraattori";
-          config.Cmd = ["${laskugeneraattori}/bin/laskugeneraattori"];
+        laskugeneraattori = craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
+      in
+      {
+        checks = {
+          inherit laskugeneraattori;
         };
-      };
 
-      devShells.default = devenv.lib.mkShell {
-        inherit inputs pkgs;
-        modules = [
-          {
-            languages.rust = {
-              enable = true;
-              channel = "stable";
-              inherit toolchain;
-            };
+        packages = {
+          default = laskugeneraattori;
+          docker = pkgs.dockerTools.buildLayeredImage {
+            name = "laskugeneraattori";
+            config.Cmd = [ "${laskugeneraattori}/bin/laskugeneraattori" ];
+          };
+        };
 
-            devcontainer = {
-              enable = true;
-              settings = {
-                updateContentCommand = "";
-                customizations.vscode.extensions = [
+        devShells.default = devenv.lib.mkShell {
+          inherit inputs pkgs;
+          modules = [
+            {
+              languages.rust = {
+                enable = true;
+                channel = "stable";
+                inherit toolchain;
+              };
+
+              devcontainer = {
+                enable = true;
+                settings.customizations.vscode.extensions = [
                   "mkhl.direnv"
                   "rust-lang.rust-analyzer"
                 ];
               };
-            };
-          }
-        ];
-      };
-    });
+            }
+          ];
+        };
+      }
+    );
 }
