@@ -7,6 +7,12 @@ use axum::{
 
 mod invoices;
 
+#[derive(Clone)]
+pub enum Mailer {
+    Mailgun(MailgunClient),
+    Debug,
+}
+
 #[derive(Clone, Debug)]
 pub struct MailgunClient {
     client: reqwest::Client,
@@ -17,21 +23,24 @@ pub struct MailgunClient {
     from: String,
 }
 
-impl From<crate::MailgunConfig> for MailgunClient {
-    fn from(config: crate::MailgunConfig) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            url: config.url,
-            api_user: config.user,
-            api_key: config.password,
-            default_to: config.to,
-            from: config.from,
+impl From<crate::MailerConfig> for Mailer {
+    fn from(config: crate::MailerConfig) -> Self {
+        match config.disable {
+            true => Self::Debug,
+            false => Self::Mailgun(MailgunClient {
+                client: reqwest::Client::new(),
+                url: config.url.expect("must exist if not disabled"),
+                api_user: config.user.expect("must exist if not disabled"),
+                api_key: config.password.expect("must exist if not disabled"),
+                default_to: config.to.expect("must exist if not disabled"),
+                from: config.from.expect("must exist if not disabled"),
+            }),
         }
     }
 }
 
 #[async_trait]
-impl<S> FromRequestParts<S> for MailgunClient
+impl<S> FromRequestParts<S> for Mailer
 where
     S: Send + Sync,
     State: FromRef<S>,
@@ -40,6 +49,6 @@ where
 
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let state = State::from_ref(state);
-        Ok(state.mailgun_client)
+        Ok(state.mailer)
     }
 }

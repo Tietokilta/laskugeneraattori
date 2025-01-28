@@ -1,8 +1,6 @@
 use std::sync::LazyLock;
 
-use crate::error::Error;
-#[cfg(feature = "email")]
-use crate::mailgun::MailgunClient;
+use crate::{error::Error, mailgun::Mailer};
 
 use axum::{async_trait, body::Bytes, http::StatusCode};
 use axum_typed_multipart::{
@@ -134,9 +132,8 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     })
 }
 
-#[cfg(feature = "email")]
 pub async fn create_email(
-    client: MailgunClient,
+    client: Mailer,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<(StatusCode, axum::Json<Invoice>), Error> {
     let orig = multipart.data.clone();
@@ -161,45 +158,4 @@ pub async fn create_email(
 
     client.send_mail(&orig, pdf).await?;
     Ok((StatusCode::CREATED, axum::Json(orig)))
-}
-
-#[cfg(not(feature = "email"))]
-pub async fn create(
-    Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
-) -> Result<axum::response::Response, Error> {
-    use tempfile::NamedTempFile;
-    use tokio::fs::File;
-    use tokio::io::AsyncWriteExt;
-
-    multipart.data.attachments =
-        Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
-
-    let document: Document = multipart.data.to_owned().try_into()?;
-    let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
-
-    let mut pdfs = vec![pdf];
-    pdfs.extend_from_slice(
-        multipart
-            .data
-            .attachments
-            .into_iter()
-            .map(|a| a.bytes)
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
-
-    let pdf = crate::merge::merge_pdf(pdfs)?;
-
-    let tmp = NamedTempFile::with_suffix(".pdf")?;
-    let (file, path) = tmp.keep().unwrap();
-    let mut file = File::from_std(file);
-    file.write_all(&pdf).await?;
-
-    info!("Wrote invoice to {:?}", path);
-
-    Ok(axum::response::Response::builder()
-        .status(StatusCode::CREATED)
-        .header("Content-Type", "application/pdf")
-        .body(Bytes::from(pdf).into())
-        .unwrap())
 }
