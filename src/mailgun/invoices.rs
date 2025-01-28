@@ -40,15 +40,7 @@ impl Mailer {
                 }
             }
             Mailer::Debug => {
-                use tempfile::NamedTempFile;
-                use tokio::fs::File;
-                use tokio::io::AsyncWriteExt;
-                let tmp = NamedTempFile::with_suffix(".pdf")?;
-                let (file, path) = tmp.keep().unwrap();
-                let mut file = File::from_std(file);
-                file.write_all(&pdf).await?;
-
-                info!("Wrote invoice to {:?}", path);
+                info!("Would send invoice: {}", serde_json::to_string(invoice)?);
                 Ok(())
             }
         }
