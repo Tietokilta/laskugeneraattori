@@ -1,0 +1,111 @@
+{
+  description = "Laskugeneraattori";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    crane.url = "github:ipetkov/crane";
+    flake-utils.url = "github:numtide/flake-utils";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    devenv.url = "github:cachix/devenv";
+  };
+
+  nixConfig = {
+    extra-trusted-public-keys = "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=";
+    extra-substituters = "https://devenv.cachix.org";
+  };
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      crane,
+      flake-utils,
+      fenix,
+      devenv,
+      ...
+    }@inputs:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ fenix.overlays.default ];
+        };
+
+        toolchain =
+          with fenix.packages.${system};
+          combine [
+            stable.rustc
+            stable.cargo
+            targets.x86_64-unknown-linux-musl.stable.rust-std
+          ];
+
+        lib = pkgs.lib;
+
+        craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+
+        unfilteredRoot = ./.;
+
+        commonArgs = {
+          src = lib.fileset.toSource {
+            root = unfilteredRoot;
+            fileset = lib.fileset.unions [
+              (craneLib.fileset.commonCargoSources unfilteredRoot)
+              (lib.fileset.maybeMissing ./templates)
+            ];
+          };
+
+          strictDeps = true;
+
+          GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
+
+          CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+
+          buildInputs = lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
+          doCheck = false;
+        };
+
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        laskugeneraattori = craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
+      in
+      {
+        checks = {
+          inherit laskugeneraattori;
+        };
+
+        packages = {
+          default = laskugeneraattori;
+          docker = pkgs.dockerTools.buildLayeredImage {
+            name = "laskugeneraattori";
+            config.Cmd = [ "${laskugeneraattori}/bin/laskugeneraattori" ];
+          };
+        };
+
+        devShells.default = devenv.lib.mkShell {
+          inherit inputs pkgs;
+          modules = [
+            {
+              languages.rust = {
+                enable = true;
+                channel = "stable";
+                inherit toolchain;
+              };
+
+              devcontainer = {
+                enable = true;
+                settings.customizations.vscode.extensions = [
+                  "mkhl.direnv"
+                  "rust-lang.rust-analyzer"
+                ];
+              };
+            }
+          ];
+        };
+      }
+    );
+}
