@@ -22,8 +22,8 @@ impl MailgunClient {
                 "attachment",
                 reqwest::multipart::Part::bytes(pdf).file_name(format!(
                     "{creator} - {date}.pdf",
-                    creator=invoice.recipient_name,
-                    date=Local::now().date_naive().format("%d.%m.%Y")
+                    creator = invoice.recipient_name,
+                    date = Local::now().date_naive().format("%Y.%m.%d")
                 )),
             );
 
