@@ -82,13 +82,12 @@
 *Perustelut*: #data.description \
 
 === Erittely
-#let rows = data.rows.map(it => ([#it.product], [#it.quantity #it.unit],
-      [#price(it.unit_price) €], [#price(it.quantity*it.unit_price) €]))
-#table(columns: (55%, 15%, 15%, 15%),
-  align: (left, right, right, right),
-  table.header([*Tuote*], [*Määrä*],  [*Hinta per*], [*Yhteensä*]),
+#let rows = data.rows.map(it => ([#it.product],[#price(it.unit_price) €]))
+#table(columns: (75%, 25%),
+  align: (left, right),
+  table.header([*Kuitti/Tuote*], [*Summa*]),
   ..rows.flatten(),
-  ..([], [], [], [*#price(data.rows.map(r => r.unit_price*r.quantity).sum()) €*])
+  ..([],[*#price(data.rows.map(r => r.unit_price).sum()) €*])
 )
 
 *IBAN-tilinumero*: #data.bank_account_number \

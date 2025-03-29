@@ -98,12 +98,6 @@ pub struct InvoiceRow {
     /// The product can be at most 128 characters
     #[garde(byte_length(max = 128))]
     pub product: String,
-    /// The quantity of the product, must be positive
-    #[garde(range(min = 1))]
-    pub quantity: i32,
-    /// The unit can be at most 128 characters
-    #[garde(byte_length(max = 128))]
-    pub unit: String,
     /// Unit price is encoded as number of cents to avoid floating-point precision bugs
     /// must be positive
     #[garde(range(min = 1))]
