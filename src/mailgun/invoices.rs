@@ -1,6 +1,7 @@
 use super::MailgunClient;
 use crate::api::invoices::Invoice;
 use crate::error::Error;
+use chrono::{self, Local};
 
 impl MailgunClient {
     pub async fn send_mail(self, invoice: &Invoice, pdf: Vec<u8>) -> Result<(), Error> {
@@ -19,7 +20,11 @@ impl MailgunClient {
             )
             .part(
                 "attachment",
-                reqwest::multipart::Part::bytes(pdf).file_name("invoice.pdf"),
+                reqwest::multipart::Part::bytes(pdf).file_name(format!(
+                    "{creator} - {date}.pdf",
+                    creator=invoice.recipient_name,
+                    date=Local::now().date_naive().format("%d.%m.%Y")
+                )),
             );
 
         let response = self
