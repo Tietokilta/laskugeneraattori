@@ -1,24 +1,17 @@
 use crate::{api::invoices::Invoice, error::Error};
-use comemo::Prehashed;
-use std::{
-    cell::{RefCell, RefMut},
-    collections::HashMap,
-    path::PathBuf,
-    sync::OnceLock,
-};
+use std::sync::LazyLock;
+use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
     diag::{FileError, FileResult},
-    eval::Tracer,
     foundations::{Bytes, Datetime, IntoValue, Value},
-    model::Document,
+    layout::PagedDocument,
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
+    utils::LazyHash,
     Library, World,
 };
 
-thread_local! {
-    static WORLD: RefCell<Sandbox> = RefCell::new(Sandbox::new());
-}
+static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
 
 #[derive(Clone, Debug)]
 pub struct FontSlot {
@@ -31,7 +24,7 @@ impl FontSlot {
     pub fn get(&self) -> Option<Font> {
         self.font
             .get_or_init(|| {
-                let data = std::fs::read(&self.path).ok()?.into();
+                let data = Bytes::new(std::fs::read(&self.path).ok()?);
                 Font::new(data, self.index)
             })
             .clone()
@@ -69,7 +62,7 @@ fn fonts() -> (FontBook, Vec<FontSlot>) {
     }
 
     for data in typst_assets::fonts() {
-        let buffer = Bytes::from_static(data);
+        let buffer = Bytes::new(data);
         for (i, font) in Font::iter(buffer).enumerate() {
             book.push(font.info().clone());
             fonts.push(FontSlot {
@@ -92,7 +85,7 @@ struct FileEntry {
 impl FileEntry {
     fn new(bytes: Vec<u8>, source: Option<Source>) -> Self {
         Self {
-            bytes: bytes.into(),
+            bytes: Bytes::new(bytes),
             source,
         }
     }
@@ -113,11 +106,11 @@ impl FileEntry {
 #[derive(Debug, Clone)]
 struct Sandbox {
     source: Source,
-    library: Prehashed<Library>,
-    book: Prehashed<FontBook>,
+    library: LazyHash<Library>,
+    book: LazyHash<FontBook>,
     fonts: Vec<FontSlot>,
 
-    files: RefCell<HashMap<FileId, FileEntry>>,
+    files: HashMap<FileId, FileEntry>,
     time: time::OffsetDateTime,
 }
 
@@ -125,16 +118,16 @@ impl Sandbox {
     fn new() -> Self {
         let (book, fonts) = fonts();
 
-        let new = Self {
-            library: Prehashed::new(Library::builder().build()),
-            book: Prehashed::new(book),
+        let mut new = Self {
+            library: LazyHash::new(Library::builder().build()),
+            book: LazyHash::new(book),
             fonts,
             source: Source::detached(include_str!("../../templates/invoice.typ")),
             time: time::OffsetDateTime::now_utc(),
-            files: RefCell::new(HashMap::new()),
+            files: HashMap::new(),
         };
 
-        new.files.borrow_mut().insert(
+        new.files.insert(
             FileId::new(None, VirtualPath::new("/tik.png")),
             FileEntry::new(include_bytes!("../../templates/tik.png").to_vec(), None),
         );
@@ -142,8 +135,8 @@ impl Sandbox {
         new
     }
 
-    fn sandbox_file(&self, id: FileId) -> FileResult<RefMut<'_, FileEntry>> {
-        if let Ok(entry) = RefMut::filter_map(self.files.borrow_mut(), |files| files.get_mut(&id)) {
+    fn sandbox_file(&self, id: FileId) -> FileResult<&FileEntry> {
+        if let Some(entry) = self.files.get(&id) {
             Ok(entry)
         } else {
             Err(FileError::NotFound(
@@ -154,35 +147,34 @@ impl Sandbox {
 
     fn with_data(&self, data: impl IntoValue) -> Self {
         let mut new = self.clone();
-        new.library.update(|l| {
-            let scope = l.global.scope_mut();
-            scope.define("data", data);
-            scope.define("COMMIT_HASH", Value::Str(env!("COMMIT_HASH").into()));
-            scope.define("VERSION", Value::Str(env!("CARGO_PKG_VERSION").into()));
-        });
+        let scope = new.library.global.scope_mut();
+        scope.define("data", data);
+        scope.define("COMMIT_HASH", Value::Str(env!("COMMIT_HASH").into()));
+        scope.define("VERSION", Value::Str(env!("CARGO_PKG_VERSION").into()));
+
         new.time = time::OffsetDateTime::now_utc();
         new
     }
 }
 
 impl World for Sandbox {
-    fn library(&self) -> &Prehashed<Library> {
+    fn library(&self) -> &LazyHash<Library> {
         &self.library
     }
 
-    fn book(&self) -> &Prehashed<FontBook> {
+    fn book(&self) -> &LazyHash<FontBook> {
         &self.book
     }
 
-    fn main(&self) -> Source {
-        self.source.clone()
+    fn main(&self) -> FileId {
+        self.source.id()
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
         if id == self.source.id() {
             Ok(self.source.clone())
         } else {
-            self.sandbox_file(id)?.source(id)
+            self.sandbox_file(id)?.clone().source(id)
         }
     }
 
@@ -208,13 +200,13 @@ impl IntoValue for Invoice {
     }
 }
 
-impl TryInto<Document> for Invoice {
+impl TryInto<PagedDocument> for Invoice {
     type Error = Error;
 
-    fn try_into(self) -> Result<Document, Error> {
-        let w = WORLD.with_borrow(|w| w.with_data(self.clone()));
+    fn try_into(self) -> Result<PagedDocument, Error> {
+        let mut w = WORLD.clone().with_data(self.clone());
         self.attachments.into_iter().for_each(|a| {
-            w.files.borrow_mut().insert(
+            w.files.insert(
                 FileId::new(
                     None,
                     VirtualPath::new("/attachments/".to_owned() + &a.filename),
@@ -223,11 +215,12 @@ impl TryInto<Document> for Invoice {
             );
         });
 
-        let mut tracer = Tracer::default();
-        let template = typst::compile(&w, &mut tracer).map_err(|e| {
-            dbg!(e);
-            Error::TypstError
-        })?;
+        let typst::diag::Warned { output, warnings } = typst::compile(&w);
+
+        let Ok(template) = output else {
+            dbg!(warnings);
+            return Err(Error::TypstError);
+        };
 
         Ok(template)
     }

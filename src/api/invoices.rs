@@ -16,7 +16,7 @@ use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
-use typst::model::Document;
+use typst::layout::PagedDocument;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
@@ -137,8 +137,8 @@ pub async fn create_email(
     multipart.data.attachments =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
 
-    let document: Document = multipart.data.to_owned().try_into()?;
-    let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
+    let document: PagedDocument = multipart.data.to_owned().try_into()?;
+    let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
     let mut pdfs = vec![pdf];
     pdfs.extend_from_slice(
@@ -168,8 +168,8 @@ pub async fn create(
     multipart.data.attachments =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
 
-    let document: Document = multipart.data.to_owned().try_into()?;
-    let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
+    let document: PagedDocument = multipart.data.to_owned().try_into()?;
+    let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
     let mut pdfs = vec![pdf];
     pdfs.extend_from_slice(
