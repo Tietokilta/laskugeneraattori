@@ -215,13 +215,19 @@ impl TryInto<PagedDocument> for Invoice {
             );
         });
 
-        let typst::diag::Warned { output, warnings } = typst::compile(&w);
+        let typst::diag::Warned {
+            output,
+            warnings: _,
+        } = typst::compile(&w);
 
-        let Ok(template) = output else {
-            dbg!(warnings);
-            return Err(Error::TypstError);
-        };
-
-        Ok(template)
+        match output {
+            Ok(template) => Ok(template),
+            Err(err) => Err(Error::TypstError(
+                err.into_iter()
+                    .map(|e| e.message.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )),
+        }
     }
 }
