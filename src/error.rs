@@ -25,8 +25,8 @@ pub enum Error {
     JsonError(#[from] serde_json::Error),
     #[error("Internal server error")]
     InternalServerError(#[from] std::io::Error),
-    #[error("Typst error")]
-    TypstError,
+    #[error("Typst error: {0}")]
+    TypstError(String),
 }
 
 impl IntoResponse for Error {
@@ -39,7 +39,9 @@ impl IntoResponse for Error {
         error!(%self);
 
         let status = match self {
-            Error::InternalServerError(_) | Error::TypstError => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::InternalServerError(_) | Error::TypstError(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
             #[cfg(feature = "email")]
             Error::ReqwestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::JsonError(_)
