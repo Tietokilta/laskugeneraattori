@@ -1,4 +1,6 @@
+use crate::api::invoices::InvoiceAttachment;
 use crate::{api::invoices::Invoice, error::Error};
+use bank_barcode::{Barcode, BarcodeBuilder};
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
@@ -222,6 +224,94 @@ impl TryInto<PagedDocument> for Invoice {
 
         match output {
             Ok(template) => Ok(template),
+            Err(err) => Err(Error::TypstError(
+                err.into_iter()
+                    .map(|e| e.message.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )),
+        }
+    }
+}
+
+impl TryFrom<Invoice> for Barcode {
+    type Error = bank_barcode::BuilderError;
+
+    fn try_from(invoice: Invoice) -> Result<Self, Self::Error> {
+        BarcodeBuilder::v4()
+            .account_number(&invoice.bank_account_number)
+            .sum(invoice.rows.iter().map(|row| row.unit_price as u32).sum())
+            .build()
+    }
+}
+
+pub struct DocumentBuilder {
+    invoice: Invoice,
+    attachments: Vec<InvoiceAttachment>,
+}
+
+impl DocumentBuilder {
+    pub fn new(invoice: Invoice, attachments: Vec<InvoiceAttachment>) -> Self {
+        Self {
+            invoice,
+            attachments,
+        }
+    }
+
+    // FIXME: this is very ugly
+    fn data(&self) -> Value {
+        let mut value: serde_json::Value = serde_json::from_str(
+            serde_json::to_string(&self.invoice)
+                .expect("BUG: serializing invoice failed")
+                .as_str(),
+        )
+        .expect("BUG: deserializing invoice failed");
+
+        let barcode = Barcode::try_from(self.invoice.clone());
+
+        value["barcode"] = barcode
+            .map(|barcode| barcode.to_string())
+            .unwrap_or_default()
+            .into();
+
+        serde_json::from_str(&value.to_string())
+            .expect("BUG: failed to deserialize into typst::Value")
+    }
+
+    #[allow(dead_code)]
+    pub fn build(self) -> Result<PagedDocument, Error> {
+        self.build_with_pdfs().map(|(doc, _)| doc)
+    }
+
+    pub fn build_with_pdfs(self) -> Result<(PagedDocument, Vec<InvoiceAttachment>), Error> {
+        let mut w = WORLD.clone().with_data(self.data());
+
+        let pdfs = self
+            .attachments
+            .into_iter()
+            .filter_map(|a| {
+                if a.filename.to_lowercase().ends_with(".pdf") {
+                    Some(a)
+                } else {
+                    w.files.insert(
+                        FileId::new(
+                            None,
+                            VirtualPath::new(format!("/attachments/{}", a.filename)),
+                        ),
+                        FileEntry::new(a.bytes, None),
+                    );
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let typst::diag::Warned {
+            output,
+            warnings: _,
+        } = typst::compile(&w);
+
+        match output {
+            Ok(template) => Ok((template, pdfs)),
             Err(err) => Err(Error::TypstError(
                 err.into_iter()
                     .map(|e| e.message.to_string())
