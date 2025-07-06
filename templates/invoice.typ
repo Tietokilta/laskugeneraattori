@@ -92,6 +92,8 @@
 
 *IBAN-tilinumero*: #data.bank_account_number \
 
+*Pankkiviivakoodi*: #data.barcode \
+
 
 === LIITTEET
 #table(columns: (1fr, 2fr),

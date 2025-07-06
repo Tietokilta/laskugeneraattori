@@ -16,8 +16,6 @@ use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
-use typst::layout::PagedDocument;
-
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
 
@@ -133,18 +131,27 @@ pub async fn create_email(
     client: MailgunClient,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<(StatusCode, axum::Json<Invoice>), Error> {
-    let orig = multipart.data.clone();
-    multipart.data.attachments =
+    use crate::pdfgen::DocumentBuilder;
+
+    let attachments: Vec<InvoiceAttachment> =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
 
-    let document: PagedDocument = multipart.data.to_owned().try_into()?;
+    multipart.data.attachments = attachments
+        .iter()
+        .map(|a| InvoiceAttachment {
+            filename: a.filename.clone(),
+            bytes: vec![],
+        })
+        .collect();
+
+    let (document, attached_pdfs) =
+        DocumentBuilder::new(multipart.data.clone(), attachments).build_with_pdfs()?;
+
     let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
     let mut pdfs = vec![pdf];
     pdfs.extend_from_slice(
-        multipart
-            .data
-            .attachments
+        attached_pdfs
             .into_iter()
             .map(|a| a.bytes)
             .collect::<Vec<_>>()
@@ -153,8 +160,8 @@ pub async fn create_email(
 
     let pdf = crate::merge::merge_pdf(pdfs)?;
 
-    client.send_mail(&orig, pdf).await?;
-    Ok((StatusCode::CREATED, axum::Json(orig)))
+    client.send_mail(&multipart.data, pdf).await?;
+    Ok((StatusCode::CREATED, axum::Json(multipart.data)))
 }
 
 #[cfg(not(feature = "email"))]
@@ -165,17 +172,27 @@ pub async fn create(
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
 
-    multipart.data.attachments =
+    use crate::pdfgen::DocumentBuilder;
+
+    let attachments: Vec<InvoiceAttachment> =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
 
-    let document: PagedDocument = multipart.data.to_owned().try_into()?;
+    multipart.data.attachments = attachments
+        .iter()
+        .map(|a| InvoiceAttachment {
+            filename: a.filename.clone(),
+            bytes: vec![],
+        })
+        .collect();
+
+    let (document, attached_pdfs) =
+        DocumentBuilder::new(multipart.data.clone(), attachments).build_with_pdfs()?;
+
     let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
     let mut pdfs = vec![pdf];
     pdfs.extend_from_slice(
-        multipart
-            .data
-            .attachments
+        attached_pdfs
             .into_iter()
             .map(|a| a.bytes)
             .collect::<Vec<_>>()
