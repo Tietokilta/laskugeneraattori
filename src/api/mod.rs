@@ -1,12 +1,16 @@
 use axum::{
     extract::DefaultBodyLimit,
-    http::{HeaderValue, Method},
+    http::{HeaderValue, Method, Request},
     routing::{get, post},
     Router,
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{
+    governor::GovernorConfigBuilder,
+    key_extractor::{KeyExtractor, SmartIpKeyExtractor},
+    GovernorLayer,
+};
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
 
 pub mod invoices;
@@ -26,6 +30,7 @@ pub fn app() -> Router<crate::state::State> {
             .burst_size(5)
             .use_headers()
             .methods(vec![Method::POST])
+            .key_extractor(SmartIpKeyExtractor {})
             .finish()
             .unwrap(),
     );
@@ -45,7 +50,6 @@ pub fn app() -> Router<crate::state::State> {
             #[cfg(not(feature = "email"))]
             post(invoices::create),
         )
-        .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
         .layer(DefaultBodyLimit::disable())
         // Limit the body to 24 MiB since the email is limited to 25 MiB
@@ -53,6 +57,22 @@ pub fn app() -> Router<crate::state::State> {
         .layer(GovernorLayer {
             config: governor_config,
         })
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &Request<_>| {
+                let extractor = SmartIpKeyExtractor {};
+                let ip = extractor
+                    .extract(req)
+                    .map(|k| k.to_string())
+                    .unwrap_or_else(|_| "unknown ip".into());
+
+                info_span!(
+                    "http_request",
+                    method = ?req.method(),
+                    uri = ?req.uri(),
+                    ip = %ip,
+                )
+            }),
+        )
 }
 
 async fn health() -> String {
