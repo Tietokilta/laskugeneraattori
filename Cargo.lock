@@ -3621,8 +3621,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 [[package]]
 name = "tower_governor"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "313fa625fea5790ed56360a30ea980e41229cf482b4835801a67ef1922bf63b9"
+source = "git+https://github.com/lajp/tower-governor?branch=x-forwarder-for-ports-v0.4.2#2912c5fd315a11a0db4889570304754c675a7705"
 dependencies = [
  "axum",
  "forwarded-header-value",
