@@ -10,7 +10,7 @@ use typst::{
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, World,
+    Library, LibraryExt, World,
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);

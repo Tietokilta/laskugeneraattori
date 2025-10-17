@@ -44,9 +44,9 @@ tower-http = { version = "0.5.1", features = ["trace", "limit", "cors"] }
 tower_governor = { git = "https://github.com/lajp/tower-governor", branch = "x-forwarder-for-ports-v0.4.2", features = ["axum"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-typst = { version = "0.13.1" }
-typst-assets = { version = "0.13.1", features = ["fonts"] }
-typst-pdf = { version = "0.13.1" }
+typst = { version = "0.14.0-rc.2" }
+typst-assets = { version = "0.13.0-rc.2", features = ["fonts"] }
+typst-pdf = { version = "0.14.0-rc.2" }
 
 [dev-dependencies]
 axum-test = "14.2.2"
