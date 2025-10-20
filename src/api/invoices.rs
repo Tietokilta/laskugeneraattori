@@ -17,7 +17,7 @@ use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|webp|pdf)$").unwrap());
 
 #[async_trait]
 impl TryFromChunks for Invoice {
@@ -144,21 +144,9 @@ pub async fn create_email(
         })
         .collect();
 
-    let (document, attached_pdfs) =
-        DocumentBuilder::new(multipart.data.clone(), attachments).build_with_pdfs()?;
+    let document = DocumentBuilder::new(multipart.data.clone(), attachments).build()?;
 
     let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
-
-    let mut pdfs = vec![pdf];
-    pdfs.extend_from_slice(
-        attached_pdfs
-            .into_iter()
-            .map(|a| a.bytes)
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
-
-    let pdf = crate::merge::merge_pdf(pdfs)?;
 
     client.send_mail(&multipart.data, pdf).await?;
     Ok((StatusCode::CREATED, axum::Json(multipart.data)))
@@ -185,21 +173,9 @@ pub async fn create(
         })
         .collect();
 
-    let (document, attached_pdfs) =
-        DocumentBuilder::new(multipart.data.clone(), attachments).build_with_pdfs()?;
+    let document = DocumentBuilder::new(multipart.data.clone(), attachments).build()?;
 
     let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
-
-    let mut pdfs = vec![pdf];
-    pdfs.extend_from_slice(
-        attached_pdfs
-            .into_iter()
-            .map(|a| a.bytes)
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
-
-    let pdf = crate::merge::merge_pdf(pdfs)?;
 
     let tmp = NamedTempFile::with_suffix(".pdf")?;
     let (file, path) = tmp.keep().unwrap();

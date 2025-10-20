@@ -2,7 +2,7 @@
   description = "Laskugeneraattori";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     crane.url = "github:ipetkov/crane";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
@@ -92,7 +92,6 @@
             {
               languages.rust = {
                 enable = true;
-                channel = "stable";
                 inherit toolchain;
               };
 

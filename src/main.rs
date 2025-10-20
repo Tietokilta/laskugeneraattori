@@ -8,7 +8,6 @@ mod api;
 mod error;
 #[cfg(feature = "email")]
 mod mailgun;
-mod merge;
 mod state;
 
 mod pdfgen;

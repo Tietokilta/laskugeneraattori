@@ -10,7 +10,7 @@ use typst::{
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, World,
+    Library, LibraryExt, World,
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
@@ -280,30 +280,17 @@ impl DocumentBuilder {
 
     #[allow(dead_code)]
     pub fn build(self) -> Result<PagedDocument, Error> {
-        self.build_with_pdfs().map(|(doc, _)| doc)
-    }
-
-    pub fn build_with_pdfs(self) -> Result<(PagedDocument, Vec<InvoiceAttachment>), Error> {
         let mut w = WORLD.clone().with_data(self.data());
 
-        let pdfs = self
-            .attachments
-            .into_iter()
-            .filter_map(|a| {
-                if a.filename.to_lowercase().ends_with(".pdf") {
-                    Some(a)
-                } else {
-                    w.files.insert(
-                        FileId::new(
-                            None,
-                            VirtualPath::new(format!("/attachments/{}", a.filename)),
-                        ),
-                        FileEntry::new(a.bytes, None),
-                    );
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        self.attachments.into_iter().for_each(|a| {
+            w.files.insert(
+                FileId::new(
+                    None,
+                    VirtualPath::new(format!("/attachments/{}", a.filename)),
+                ),
+                FileEntry::new(a.bytes, None),
+            );
+        });
 
         let typst::diag::Warned {
             output,
@@ -311,7 +298,7 @@ impl DocumentBuilder {
         } = typst::compile(&w);
 
         match output {
-            Ok(template) => Ok((template, pdfs)),
+            Ok(template) => Ok(template),
             Err(err) => Err(Error::TypstError(
                 err.into_iter()
                     .map(|e| e.message.to_string())
