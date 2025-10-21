@@ -6,7 +6,6 @@ use std::sync::LazyLock;
 
 mod api;
 mod error;
-#[cfg(feature = "email")]
 mod mailgun;
 mod merge;
 mod state;
@@ -19,30 +18,54 @@ mod tests;
 #[macro_use]
 extern crate tracing;
 
-#[cfg(feature = "email")]
 #[derive(Parser, Clone, Debug)]
 struct MailgunConfig {
+    #[clap(
+        long = "mailgun-disable",
+        env = "MAILGUN_DISABLE",
+        default_value = "false"
+    )]
+    disable: bool,
     /// Url used by mailgun
-    #[clap(long = "mailgun-url", env = "MAILGUN_URL")]
-    url: String,
+    #[clap(
+        long = "mailgun-url",
+        env = "MAILGUN_URL",
+        required_if_eq("disable", "false")
+    )]
+    url: Option<String>,
     /// Username used by mailgun
-    #[clap(long = "mailgun-user", env = "MAILGUN_USER")]
-    user: String,
+    #[clap(
+        long = "mailgun-user",
+        env = "MAILGUN_USER",
+        required_if_eq("disable", "false")
+    )]
+    user: Option<String>,
     /// Password used by mailgun
-    #[clap(long = "mailgun-password", env = "MAILGUN_PASSWORD")]
-    password: String,
+    #[clap(
+        long = "mailgun-password",
+        env = "MAILGUN_PASSWORD",
+        required_if_eq("disable", "false")
+    )]
+    password: Option<String>,
     /// Initial To-value used by mailgun
-    #[clap(long = "mailgun-to", env = "MAILGUN_TO")]
-    to: String,
+    #[clap(
+        long = "mailgun-to",
+        env = "MAILGUN_TO",
+        required_if_eq("disable", "false")
+    )]
+    to: Option<String>,
     /// From-value used by mailgun
-    #[clap(long = "mailgun-from", env = "MAILGUN_FROM")]
-    from: String,
+    #[clap(
+        long = "mailgun-from",
+        env = "MAILGUN_FROM",
+        required_if_eq("disable", "false")
+    )]
+    from: Option<String>,
 }
 
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None)]
 struct LaskugenConfig {
-    #[cfg(feature = "email")]
     #[clap(flatten)]
     mailgun: MailgunConfig,
     /// The listen port for the HTTP server

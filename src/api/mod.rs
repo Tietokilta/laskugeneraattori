@@ -43,20 +43,12 @@ pub fn app() -> Router<crate::state::State> {
 
     Router::new()
         .route("/health", get(health))
-        .route(
-            "/invoices",
-            #[cfg(feature = "email")]
-            post(invoices::create_email),
-            #[cfg(not(feature = "email"))]
-            post(invoices::create),
-        )
+        .route("/invoices", post(invoices::create))
         .layer(cors_layer)
         .layer(DefaultBodyLimit::disable())
         // Limit the body to 24 MiB since the email is limited to 25 MiB
         .layer(RequestBodyLimitLayer::new(24 * 1024 * 1024))
-        .layer(GovernorLayer {
-            config: governor_config,
-        })
+        .layer(GovernorLayer::new(governor_config))
         .layer(
             TraceLayer::new_for_http().make_span_with(|req: &Request<_>| {
                 let extractor = SmartIpKeyExtractor {};

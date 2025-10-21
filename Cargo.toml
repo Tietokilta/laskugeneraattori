@@ -8,46 +8,45 @@ authors = ["Luukas Pörtfors <lajp@iki.fi>"]
 lto = true
 
 [features]
-default = ["email"]
+default = []
 system_fonts = ["dep:fontdb"]
-email = ["dep:reqwest"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.7.4", features = ["macros", "multipart"] }
-axum-valid = { version = "0.14.0", features = [
+axum = { version = "0.8.6", features = ["macros", "multipart"] }
+axum-valid = { version = "0.24.0", features = [
     "basic",
     "full_garde",
     "typed_multipart",
 ], default-features = false }
-axum_typed_multipart = "0.11.0"
+axum_typed_multipart = "0.16.4"
 bank-barcode = "0.1.0"
-chrono = "0.4.40"
-clap = { version = "4.5.16", features = ["env", "derive"] }
+chrono = "0.4.42"
+clap = { version = "4.5.50", features = ["env", "derive"] }
 dotenv = "0.15.0"
-fontdb = { version = "0.17.0", optional = true }
-futures = "0.3.30"
-garde = "0.17.0"
-iban_validate = "4.0.1"
+fontdb = { version = "0.23.0", optional = true }
+futures = "0.3.31"
+garde = { version = "0.22.0", features = ["derive", "phone-number"] }
+iban_validate = "5.0.1"
 lopdf = { git = "https://github.com/J-F-Liu/lopdf.git", rev = "7f24a1c3ebc42470a37b4315b843331e4f81cdcd" }
-regex = "1.10.6"
-reqwest = { version = "0.12.5", default-features = false, features = ["multipart", "rustls-tls"], optional = true }
-serde = "1.0.195"
-serde_derive = "1.0.195"
-serde_json = "1.0.111"
-tempfile = "3.13.0"
-thiserror = "1.0.56"
-time = { version = "0.3.36" }
-tokio = { version = "1.35.1", features = ["full"] }
-tower-http = { version = "0.5.1", features = ["trace", "limit", "cors"] }
-tower_governor = { git = "https://github.com/lajp/tower-governor", branch = "x-forwarder-for-ports-v0.4.2", features = ["axum"] }
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+regex = "1.12.2"
+reqwest = { version = "0.12.24", default-features = false, features = ["multipart", "rustls-tls"] }
+serde = "1.0.228"
+serde_derive = "1.0.228"
+serde_json = "1.0.145"
+tempfile = "3.23.0"
+thiserror = "2.0.17"
+time = { version = "0.3.44" }
+tokio = { version = "1.48.0", features = ["full"] }
+tower-http = { version = "0.6.6", features = ["trace", "limit", "cors"] }
+tower_governor = { git = "https://github.com/lajp/tower-governor", branch = "x-forwarder-for-ports", features = ["axum"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 typst = { version = "0.13.1" }
-typst-assets = { version = "0.13.1", features = ["fonts"] }
+typst-assets = { version = "0.14.0", features = ["fonts"] }
 typst-pdf = { version = "0.13.1" }
 
 [dev-dependencies]
-axum-test = "14.2.2"
-tower = { version = "0.4.13", features = ["util"] }
+axum-test = "18.1.0"
+tower = { version = "0.5.2", features = ["util"] }
