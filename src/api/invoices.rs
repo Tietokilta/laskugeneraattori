@@ -144,21 +144,28 @@ pub async fn create_email(
         })
         .collect();
 
-    let (document, attached_pdfs) =
-        DocumentBuilder::new(multipart.data.clone(), attachments).build_with_pdfs()?;
+    let inner_data = multipart.data.clone();
 
-    let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
+    // PDF compilation is heavily blocking
+    let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
+        let (document, attached_pdfs) =
+            DocumentBuilder::new(inner_data, attachments).build_with_pdfs()?;
 
-    let mut pdfs = vec![pdf];
-    pdfs.extend_from_slice(
-        attached_pdfs
-            .into_iter()
-            .map(|a| a.bytes)
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
+        let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
-    let pdf = crate::merge::merge_pdf(pdfs)?;
+        let mut pdfs = vec![pdf];
+        pdfs.extend_from_slice(
+            attached_pdfs
+                .into_iter()
+                .map(|a| a.bytes)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+
+        let pdf = crate::merge::merge_pdf(pdfs)?;
+        Ok(pdf)
+    })
+    .await??;
 
     client.send_mail(&multipart.data, pdf).await?;
     Ok((StatusCode::CREATED, axum::Json(multipart.data)))
@@ -185,21 +192,28 @@ pub async fn create(
         })
         .collect();
 
-    let (document, attached_pdfs) =
-        DocumentBuilder::new(multipart.data.clone(), attachments).build_with_pdfs()?;
+    let inner_data = multipart.data.clone();
 
-    let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
+    // PDF compilation is heavily blocking
+    let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
+        let (document, attached_pdfs) =
+            DocumentBuilder::new(inner_data, attachments).build_with_pdfs()?;
 
-    let mut pdfs = vec![pdf];
-    pdfs.extend_from_slice(
-        attached_pdfs
-            .into_iter()
-            .map(|a| a.bytes)
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
+        let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
-    let pdf = crate::merge::merge_pdf(pdfs)?;
+        let mut pdfs = vec![pdf];
+        pdfs.extend_from_slice(
+            attached_pdfs
+                .into_iter()
+                .map(|a| a.bytes)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+
+        let pdf = crate::merge::merge_pdf(pdfs)?;
+        Ok(pdf)
+    })
+    .await??;
 
     let tmp = NamedTempFile::with_suffix(".pdf")?;
     let (file, path) = tmp.keep().unwrap();

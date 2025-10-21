@@ -27,6 +27,8 @@ pub enum Error {
     InternalServerError(#[from] std::io::Error),
     #[error("Typst error: {0}")]
     TypstError(String),
+    #[error("Failed to join task")]
+    JoinError(#[from] tokio::task::JoinError),
 }
 
 impl IntoResponse for Error {
@@ -39,7 +41,7 @@ impl IntoResponse for Error {
         error!(%self);
 
         let status = match self {
-            Error::InternalServerError(_) | Error::TypstError(_) => {
+            Error::InternalServerError(_) | Error::TypstError(_) | Error::JoinError(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
             #[cfg(feature = "email")]
