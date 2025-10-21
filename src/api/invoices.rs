@@ -1,10 +1,9 @@
 use std::sync::LazyLock;
 
 use crate::error::Error;
-#[cfg(feature = "email")]
 use crate::mailgun::MailgunClient;
 
-use axum::{async_trait, body::Bytes, http::StatusCode};
+use axum::{body::Bytes, http::StatusCode};
 use axum_typed_multipart::{
     FieldData, FieldMetadata, TryFromChunks, TryFromMultipart, TypedMultipart, TypedMultipartError,
 };
@@ -19,7 +18,7 @@ use serde_derive::{Deserialize, Serialize};
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
 
-#[async_trait]
+#[axum_typed_multipart::async_trait]
 impl TryFromChunks for Invoice {
     async fn try_from_chunks(
         chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
@@ -40,11 +39,11 @@ fn is_valid_iban(value: &str, _: &()) -> garde::Result {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct Address {
-    #[garde(byte_length(max = 128))]
+    #[garde(length(chars, max = 128))]
     pub street: String,
-    #[garde(byte_length(max = 128))]
+    #[garde(length(chars, max = 128))]
     pub city: String,
-    #[garde(byte_length(max = 128))]
+    #[garde(length(chars, max = 128))]
     pub zip: String,
 }
 
@@ -52,25 +51,24 @@ pub struct Address {
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct Invoice {
     /// The recipient's name
-    #[garde(byte_length(max = 128))]
+    #[garde(length(chars, max = 128))]
     pub recipient_name: String,
     /// The recipient's email
-    #[garde(byte_length(max = 128))]
+    #[garde(length(chars, max = 128))]
     pub recipient_email: String,
     /// The recipient's address
     #[garde(dive)]
     pub address: Address,
     /// The recipient's bank account number
-    // TODO: maybe validate with https://crates.io/crates/iban_validate/
-    #[garde(byte_length(max = 128), custom(is_valid_iban))]
+    #[garde(length(chars, max = 128), custom(is_valid_iban))]
     pub bank_account_number: String,
-    #[garde(byte_length(min = 1, max = 128))]
+    #[garde(length(chars, min = 1, max = 128))]
     pub subject: String,
-    #[garde(byte_length(max = 4096))]
+    #[garde(length(chars, max = 4096))]
     pub description: String,
-    #[garde(phone_number, byte_length(max = 32))]
+    #[garde(phone_number, length(chars, max = 32))]
     pub phone_number: String,
-    #[garde(inner(byte_length(max = 512)))]
+    #[garde(inner(length(chars, max = 512)))]
     pub attachment_descriptions: Vec<String>,
     /// The rows of the invoice
     #[garde(length(min = 1), dive)]
@@ -94,7 +92,7 @@ pub struct InvoiceForm {
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct InvoiceRow {
     /// The product can be at most 128 characters
-    #[garde(byte_length(max = 128))]
+    #[garde(length(chars, max = 128))]
     pub product: String,
     /// Unit price is encoded as number of cents to avoid floating-point precision bugs
     /// must be positive
@@ -126,9 +124,8 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     })
 }
 
-#[cfg(feature = "email")]
-pub async fn create_email(
-    client: MailgunClient,
+pub async fn create(
+    client: Option<MailgunClient>,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<(StatusCode, axum::Json<Invoice>), Error> {
     use crate::pdfgen::DocumentBuilder;
@@ -167,64 +164,20 @@ pub async fn create_email(
     })
     .await??;
 
-    client.send_mail(&multipart.data, pdf).await?;
+    if let Some(client) = client {
+        client.send_mail(&multipart.data, pdf).await?;
+    } else {
+        use tempfile::NamedTempFile;
+        use tokio::fs::File;
+        use tokio::io::AsyncWriteExt;
+
+        let tmp = NamedTempFile::with_suffix(".pdf")?;
+        let (file, path) = tmp.keep().unwrap();
+        let mut file = File::from_std(file);
+        file.write_all(&pdf).await?;
+
+        info!("Wrote invoice to {:?}", path);
+    }
+
     Ok((StatusCode::CREATED, axum::Json(multipart.data)))
-}
-
-#[cfg(not(feature = "email"))]
-pub async fn create(
-    Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
-) -> Result<axum::response::Response, Error> {
-    use tempfile::NamedTempFile;
-    use tokio::fs::File;
-    use tokio::io::AsyncWriteExt;
-
-    use crate::pdfgen::DocumentBuilder;
-
-    let attachments: Vec<InvoiceAttachment> =
-        Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
-
-    multipart.data.attachments = attachments
-        .iter()
-        .map(|a| InvoiceAttachment {
-            filename: a.filename.clone(),
-            bytes: vec![],
-        })
-        .collect();
-
-    let inner_data = multipart.data.clone();
-
-    // PDF compilation is heavily blocking
-    let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
-        let (document, attached_pdfs) =
-            DocumentBuilder::new(inner_data, attachments).build_with_pdfs()?;
-
-        let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
-
-        let mut pdfs = vec![pdf];
-        pdfs.extend_from_slice(
-            attached_pdfs
-                .into_iter()
-                .map(|a| a.bytes)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-
-        let pdf = crate::merge::merge_pdf(pdfs)?;
-        Ok(pdf)
-    })
-    .await??;
-
-    let tmp = NamedTempFile::with_suffix(".pdf")?;
-    let (file, path) = tmp.keep().unwrap();
-    let mut file = File::from_std(file);
-    file.write_all(&pdf).await?;
-
-    info!("Wrote invoice to {:?}", path);
-
-    Ok(axum::response::Response::builder()
-        .status(StatusCode::CREATED)
-        .header("Content-Type", "application/pdf")
-        .body(Bytes::from(pdf).into())
-        .unwrap())
 }
