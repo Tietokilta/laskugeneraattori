@@ -1372,7 +1372,6 @@ checksum = "6a989bd2fd12136080f7825ff410d9239ce84a2a639487fc9d924ee42e2fb84f"
 dependencies = [
  "compact_str",
  "garde_derive",
- "phonenumber",
  "serde",
  "smallvec",
 ]
@@ -2101,6 +2100,7 @@ dependencies = [
  "garde",
  "iban_validate",
  "lopdf",
+ "phonenumber",
  "regex",
  "reqwest",
  "serde",

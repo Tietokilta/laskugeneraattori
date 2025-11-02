@@ -160,6 +160,22 @@ async fn reject_invalid_phone_number() {
 }
 
 #[tokio::test]
+async fn allow_phone_number_without_contry_code() {
+    let server = create_test_server().await;
+    let mut invoice = valid_invoice_json();
+    invoice["phone_number"] = serde_json::json!("0401234567");
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+}
+
+#[tokio::test]
 async fn reject_empty_rows() {
     let server = create_test_server().await;
     let invoice = invoice_with_empty_rows();
