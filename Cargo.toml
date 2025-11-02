@@ -35,9 +35,10 @@ clap = { version = "4.5.50", features = ["env", "derive"] }
 dotenv = "0.15.0"
 fontdb = { version = "0.23.0", optional = true }
 futures = "0.3.31"
-garde = { version = "0.22.0", features = ["derive", "phone-number"] }
+garde = { version = "0.22.0", features = ["derive"] }
 iban_validate = "5.0.1"
 lopdf = { version = "0.38.0" }
+phonenumber = "0.3.7"
 regex = "1.12.2"
 reqwest = { version = "0.12.24", default-features = false, features = ["multipart", "rustls-tls"] }
 serde = "1.0.228"
