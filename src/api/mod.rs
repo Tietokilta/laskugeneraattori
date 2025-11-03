@@ -1,7 +1,6 @@
 use axum::{
     extract::DefaultBodyLimit,
     http::{HeaderValue, Method, Request},
-    routing::{get, post},
     Router,
 };
 use std::sync::Arc;
@@ -12,6 +11,8 @@ use tower_governor::{
     GovernorLayer,
 };
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
+use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa_swagger_ui::SwaggerUi;
 
 pub mod invoices;
 
@@ -41,9 +42,13 @@ pub fn app() -> Router<crate::state::State> {
         governor_limiter.retain_recent();
     });
 
+    let (router, api) = OpenApiRouter::new()
+        .routes(routes!(health, invoices::create))
+        .split_for_parts();
+
     Router::new()
-        .route("/health", get(health))
-        .route("/invoices", post(invoices::create))
+        .merge(router)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api/openapi.json", api))
         .layer(cors_layer)
         .layer(DefaultBodyLimit::disable())
         // Limit the body to 24 MiB since the email is limited to 25 MiB
@@ -67,6 +72,8 @@ pub fn app() -> Router<crate::state::State> {
         )
 }
 
+/// Checks the health of the service and returns build information
+#[utoipa::path(get, path = "/health", responses((status = 200, body = String)))]
 async fn health() -> String {
     format!(
         "Laskugeneraattori {} {}",

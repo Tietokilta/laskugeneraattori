@@ -14,6 +14,7 @@ use garde::Validate;
 use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
@@ -37,37 +38,47 @@ fn is_valid_iban(value: &str, _: &()) -> garde::Result {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+/// An address consisting of a street, a city and a zipcode
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct Address {
+    /// The recipient's street address, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub street: String,
+    /// The recipient's city, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub city: String,
+    /// The recipient's zip code, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub zip: String,
 }
 
 /// Body for the request for creating new invoices
-#[derive(Clone, Debug, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct Invoice {
-    /// The recipient's name
+    /// The recipient's name, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub recipient_name: String,
-    /// The recipient's email
+    /// The recipient's email, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub recipient_email: String,
     /// The recipient's address
     #[garde(dive)]
     pub address: Address,
-    /// The recipient's bank account number
+    /// The recipient's bank account number, must be a valid iban bank account number
     #[garde(length(chars, max = 128), custom(is_valid_iban))]
     pub bank_account_number: String,
+    /// The subject of the invoice, at least 1 character and at most 128 characters long
     #[garde(length(chars, min = 1, max = 128))]
     pub subject: String,
+    /// The description of the invoice, maximum length of 128 characters
     #[garde(length(chars, max = 4096))]
     pub description: String,
+    /// The recipient's phone number, maximum length of 32 characters, must be valid and include
+    /// the counter prefix (e.g. +358)
     #[garde(phone_number, length(chars, max = 32))]
     pub phone_number: String,
+    /// A list of descriptions for the attached files, each with the maximum length of 512
+    /// characters
     #[garde(inner(length(chars, max = 512)))]
     pub attachment_descriptions: Vec<String>,
     /// The rows of the invoice
@@ -79,17 +90,20 @@ pub struct Invoice {
     pub attachments: Vec<InvoiceAttachment>,
 }
 
-#[derive(TryFromMultipart, Validate)]
+#[derive(TryFromMultipart, Validate, ToSchema)]
 pub struct InvoiceForm {
+    /// The JSON data of the invoice
     #[garde(dive)]
     pub data: Invoice,
+    /// The attachments of the invoice
     // FIXME: Maybe use NamedTempFile
     #[garde(skip)]
     #[form_data(limit = "unlimited")]
+    #[schema(value_type = Vec<u8>)]
     pub attachments: Vec<FieldData<Bytes>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct InvoiceRow {
     /// The product can be at most 128 characters
     #[garde(length(chars, max = 128))]
@@ -100,7 +114,7 @@ pub struct InvoiceRow {
     pub unit_price: i32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct InvoiceAttachment {
     pub filename: String,
     pub bytes: Vec<u8>,
@@ -124,6 +138,13 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     })
 }
 
+/// Creates an invoice with the given data and attachments and sends it by email to the treasurer
+#[utoipa::path(post, path = "/invoices", 
+    request_body(content_type = "multipart/form-data", content = InvoiceForm), 
+    responses(
+        (status = 201, body = Invoice)
+    )
+)]
 pub async fn create(
     client: Option<MailgunClient>,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
