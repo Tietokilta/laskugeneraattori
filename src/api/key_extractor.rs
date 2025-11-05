@@ -36,3 +36,91 @@ impl KeyExtractor for IpExtractor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::Request;
+
+    #[test]
+    fn header_extractor_with_valid_ipv4() {
+        let extractor = IpExtractor::header_extractor("x-forwarded-for");
+        let req = Request::builder()
+            .header("x-forwarded-for", "192.168.1.1")
+            .body(())
+            .unwrap();
+
+        let result = extractor.extract(&req);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "192.168.1.1".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn header_extractor_with_valid_ipv6() {
+        let extractor = IpExtractor::header_extractor("x-real-ip");
+        let req = Request::builder()
+            .header("x-real-ip", "2001:0db8::1")
+            .body(())
+            .unwrap();
+
+        let result = extractor.extract(&req);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "2001:0db8::1".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn header_extractor_trims_whitespace() {
+        let extractor = IpExtractor::header_extractor("x-forwarded-for");
+        let req = Request::builder()
+            .header("x-forwarded-for", "  192.168.1.1  ")
+            .body(())
+            .unwrap();
+
+        let result = extractor.extract(&req);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "192.168.1.1".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn header_extractor_with_invalid_ip() {
+        let extractor = IpExtractor::header_extractor("x-forwarded-for");
+        let req = Request::builder()
+            .header("x-forwarded-for", "not-an-ip")
+            .body(())
+            .unwrap();
+
+        let result = extractor.extract(&req);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(GovernorError::UnableToExtractKey)));
+    }
+
+    #[test]
+    fn header_extractor_with_missing_header() {
+        let extractor = IpExtractor::header_extractor("x-forwarded-for");
+        let req = Request::builder().body(()).unwrap();
+
+        let result = extractor.extract(&req);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(GovernorError::UnableToExtractKey)));
+    }
+
+    #[test]
+    fn header_extractor_with_empty_header() {
+        let extractor = IpExtractor::header_extractor("x-forwarded-for");
+        let req = Request::builder()
+            .header("x-forwarded-for", "")
+            .body(())
+            .unwrap();
+
+        let result = extractor.extract(&req);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(GovernorError::UnableToExtractKey)));
+    }
+
+    #[test]
+    fn ip_extractor_implements_copy() {
+        let extractor = IpExtractor::header_extractor("x-forwarded-for");
+        let _extractor_copy = extractor;
+        let _extractor_again = extractor;
+    }
+}
