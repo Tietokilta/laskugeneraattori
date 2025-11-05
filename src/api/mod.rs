@@ -35,7 +35,7 @@ pub fn app() -> Router<crate::state::State> {
             .burst_size(5)
             .use_headers()
             .methods(vec![Method::POST])
-            .key_extractor(extractor.clone())
+            .key_extractor(extractor)
             .finish()
             .unwrap(),
     );

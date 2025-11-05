@@ -5,7 +5,7 @@ use tower_governor::{
     GovernorError,
 };
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum IpExtractor {
     HeaderKeyExtractor { header_name: &'static str },
     PeerIpKeyExtractor,
@@ -29,7 +29,7 @@ impl KeyExtractor for IpExtractor {
                 .headers()
                 .get(*header_name)
                 .and_then(|hv| hv.to_str().ok())
-                .and_then(|s| s.parse::<IpAddr>().ok())
+                .and_then(|s| s.trim().parse().ok())
                 .ok_or(GovernorError::UnableToExtractKey),
 
             IpExtractor::PeerIpKeyExtractor => PeerIpKeyExtractor {}.extract(req),
