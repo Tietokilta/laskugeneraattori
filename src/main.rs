@@ -77,6 +77,9 @@ struct LaskugenConfig {
     /// A comma-separated list of allowed origins
     #[clap(long, env, required = false, value_delimiter = ',')]
     allowed_origins: Vec<String>,
+    /// HTTP header name to extract client IP address from for rate limiting (defaults to peer IP if not set)
+    #[clap(long, env, required = false)]
+    ip_extractor_header: Option<String>,
 }
 
 static CONFIG: LazyLock<LaskugenConfig> = LazyLock::new(LaskugenConfig::parse);

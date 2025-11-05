@@ -6,14 +6,13 @@ use axum::{
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tower_governor::{
-    governor::GovernorConfigBuilder,
-    key_extractor::{KeyExtractor, SmartIpKeyExtractor},
-    GovernorLayer,
-};
+use tower_governor::{governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorLayer};
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
 
+use crate::{api::key_extractor::IpExtractor, CONFIG};
+
 pub mod invoices;
+mod key_extractor;
 
 pub fn app() -> Router<crate::state::State> {
     let cors_layer = CorsLayer::new().allow_origin(
@@ -24,13 +23,19 @@ pub fn app() -> Router<crate::state::State> {
             .collect::<Vec<_>>(),
     );
 
+    let extractor = CONFIG
+        .ip_extractor_header
+        .as_ref()
+        .map(|ip_header| IpExtractor::header_extractor(ip_header))
+        .unwrap_or(IpExtractor::PeerIpKeyExtractor);
+
     let governor_config = Arc::new(
         GovernorConfigBuilder::default()
             .const_period(Duration::from_secs(720))
             .burst_size(5)
             .use_headers()
             .methods(vec![Method::POST])
-            .key_extractor(SmartIpKeyExtractor {})
+            .key_extractor(extractor)
             .finish()
             .unwrap(),
     );
@@ -50,8 +55,7 @@ pub fn app() -> Router<crate::state::State> {
         .layer(RequestBodyLimitLayer::new(24 * 1024 * 1024))
         .layer(GovernorLayer::new(governor_config))
         .layer(
-            TraceLayer::new_for_http().make_span_with(|req: &Request<_>| {
-                let extractor = SmartIpKeyExtractor {};
+            TraceLayer::new_for_http().make_span_with(move |req: &Request<_>| {
                 let ip = extractor
                     .extract(req)
                     .map(|k| k.to_string())
