@@ -29,7 +29,7 @@ fontdb = { version = "0.23.0", optional = true }
 futures = "0.3.31"
 garde = { version = "0.22.0", features = ["derive", "phone-number"] }
 iban_validate = "5.0.1"
-lopdf = { git = "https://github.com/J-F-Liu/lopdf.git", rev = "7f24a1c3ebc42470a37b4315b843331e4f81cdcd" }
+lopdf = { version = "0.38.0" }
 regex = "1.12.2"
 reqwest = { version = "0.12.24", default-features = false, features = ["multipart", "rustls-tls"] }
 serde = "1.0.228"
