@@ -144,3 +144,71 @@ pub fn merge_pdf(documents: Vec<Vec<u8>>) -> Result<Vec<u8>, Error> {
         .expect("Error saving merged PDF");
     Ok(buffer)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    // Helper function for testing PDFs
+    // Expects the merged PDF (with one page from sample pdf) to have `expected_pages` pages and contain `expected_text`
+    fn test_pdf(filename: &str, expected_pages: usize, expected_text: &str) {
+        // Load test PDFs
+        let test_pdf = fs::read("testdata/test.pdf").expect("Failed to read test.pdf");
+        let http_header_pdf = fs::read(filename).expect("Failed to read PDF file");
+
+        // Merge the PDFs
+        let merged_pdf = merge_pdf(vec![test_pdf, http_header_pdf]).expect("Failed to merge PDFs");
+
+        // Load the merged PDF to verify
+        let document = Document::load_mem(&merged_pdf).expect("Failed to load merged PDF");
+
+        // Check that the merged PDF has correct number of pages
+        let pages = document.get_pages();
+        assert_eq!(
+            pages.len(),
+            expected_pages,
+            "Merged PDF should have {} pages",
+            expected_pages
+        );
+
+        // Extract text from the PDF to verify content
+        let mut found_text = false;
+        for (page_num, _) in pages.iter() {
+            if let Ok(text) = document.extract_text(&[*page_num]) {
+                if text.contains(expected_text) {
+                    found_text = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(found_text, "Merged PDF should contain '{}'", expected_text);
+    }
+
+    // Sample test with a normal PDF
+    #[test]
+    fn test_merge_simple_pdf() {
+        test_pdf("testdata/regression/normal.pdf", 2, "Sample pdf content");
+    }
+
+    // Regression test for PDFs that have HTTP headers before the PDF content
+    #[test]
+    fn test_merge_pdf_with_http_header() {
+        test_pdf(
+            "testdata/regression/http-header.pdf",
+            2,
+            "Sample pdf content",
+        );
+    }
+
+    // Regression test for PDFs that have extra whitespace after "stream" keyword
+    #[test]
+    fn test_merge_pdf_with_whitespace_stream() {
+        test_pdf(
+            "testdata/regression/whitespace-stream.pdf",
+            2,
+            "Sample pdf content",
+        );
+    }
+}
