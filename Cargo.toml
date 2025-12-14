@@ -36,7 +36,7 @@ dotenv = "0.15.0"
 fontdb = { version = "0.23.0", optional = true }
 futures = "0.3.31"
 garde = { version = "0.22.0", features = ["derive", "phone-number"] }
-iban_validate = "5.0.1"
+iban_validate = { version = "5.0.1", features = ["serde"] }
 lopdf = { version = "0.38.0" }
 regex = "1.12.2"
 reqwest = { version = "0.12.24", default-features = false, features = ["multipart", "rustls-tls"] }
