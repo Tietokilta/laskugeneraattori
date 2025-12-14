@@ -7,10 +7,10 @@ WORKDIR /app
 # Copy over the Cargo.toml files to the shell project
 COPY Cargo.toml Cargo.lock build.rs ./
 # Build and cache the dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "" > src/lib.rs
 RUN cargo fetch
 RUN cargo build --release
-RUN rm src/main.rs
+RUN rm src/main.rs src/lib.rs
 
 # Copy the actual code files and build the application
 COPY ./src ./src
