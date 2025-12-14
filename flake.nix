@@ -55,6 +55,7 @@
             fileset = lib.fileset.unions [
               (craneLib.fileset.commonCargoSources unfilteredRoot)
               (lib.fileset.maybeMissing ./templates)
+              (lib.fileset.maybeMissing ./testdata)
             ];
           };
 
@@ -65,8 +66,6 @@
           CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
 
           buildInputs = lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
-
-          doCheck = false;
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
