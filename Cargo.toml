@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luukas Pörtfors <lajp@iki.fi>"]
 
+[lib]
+name = "laskugeneraattori"
+path = "src/lib.rs"
+
+[[bin]]
+name = "laskugeneraattori"
+path = "src/main.rs"
+
 [profile.release]
 lto = true
 

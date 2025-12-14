@@ -31,8 +31,8 @@ pub fn app() -> Router<crate::state::State> {
 
     let governor_config = Arc::new(
         GovernorConfigBuilder::default()
-            .const_period(Duration::from_secs(720))
-            .burst_size(5)
+            .const_period(Duration::from_secs(CONFIG.rate_limit_period_secs))
+            .burst_size(CONFIG.rate_limit_burst_size)
             .use_headers()
             .methods(vec![Method::POST])
             .key_extractor(extractor)
