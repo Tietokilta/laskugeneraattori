@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{fmt::Display, sync::LazyLock};
 
 use crate::error::Error;
 use crate::mailgun::MailgunClient;
@@ -11,7 +11,7 @@ use axum_typed_multipart::{
 use axum_valid::Garde;
 use futures::stream::Stream;
 use garde::Validate;
-use iban::Iban;
+use iban::{Iban, IbanLike};
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
@@ -30,13 +30,6 @@ impl TryFromChunks for Invoice {
     }
 }
 
-fn is_valid_iban(value: &str, _: &()) -> garde::Result {
-    match value.parse::<Iban>() {
-        Err(e) => Err(garde::Error::new(e)),
-        _ => Ok(()),
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct Address {
     #[garde(length(chars, max = 128))]
@@ -45,6 +38,24 @@ pub struct Address {
     pub city: String,
     #[garde(length(chars, max = 128))]
     pub zip: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct IbanElectronicString(String);
+
+impl Display for IbanElectronicString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for IbanElectronicString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Iban::deserialize(deserializer).map(|iban| Self(iban.electronic_str().to_string()))
+    }
 }
 
 /// Body for the request for creating new invoices
@@ -60,8 +71,8 @@ pub struct Invoice {
     #[garde(dive)]
     pub address: Address,
     /// The recipient's bank account number
-    #[garde(length(chars, max = 128), custom(is_valid_iban))]
-    pub bank_account_number: String,
+    #[garde(skip)]
+    pub bank_account_number: IbanElectronicString,
     #[garde(length(chars, min = 1, max = 128))]
     pub subject: String,
     #[garde(length(chars, max = 4096))]
