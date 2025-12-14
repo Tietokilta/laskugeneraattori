@@ -1,8 +1,6 @@
-use axum::body::Body;
-use axum::http::request::Request;
 use axum::http::StatusCode;
+use axum_test::TestServer;
 use laskugeneraattori::{api::app, state};
-use tower::ServiceExt;
 
 fn setup_test_env() {
     std::env::set_var("MAILGUN_DISABLE", "true");
@@ -13,16 +11,9 @@ fn setup_test_env() {
 async fn health() {
     setup_test_env();
     let app = app().with_state(state::new().await);
+    let server = TestServer::new(app).unwrap();
 
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/health")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+    let response = server.get("/health").await;
 
-    assert_eq!(response.status(), StatusCode::OK);
+    response.assert_status(StatusCode::OK);
 }

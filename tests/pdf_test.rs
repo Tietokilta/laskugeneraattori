@@ -1,45 +1,47 @@
 mod common;
 
-use axum::body::to_bytes;
 use axum::http::StatusCode;
 use common::{
-    create_test_app,
+    create_invoice_form, create_invoice_form_with_file, create_invoice_form_with_files,
+    create_test_server,
     fixtures::{invoice_with_attachment_descriptions, valid_invoice_json},
-    multipart::{create_invoice_request, create_invoice_request_with_file, load_test_file},
+    load_test_file, TEST_IP, TEST_IP_HEADER,
 };
-use tower::ServiceExt;
+use serde_json::Value;
 
 #[tokio::test]
 async fn invoice_creation_returns_valid_json_response() {
-    let app = create_test_app().await;
+    let server = create_test_server().await;
     let invoice = valid_invoice_json();
-    let request = create_invoice_request(&invoice);
+    let form = create_invoice_form(&invoice);
 
-    let response = app.oneshot(request).await.unwrap();
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
 
-    assert_eq!(response.status(), StatusCode::CREATED);
-
-    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
     assert_eq!(response_json["recipient_name"], "Test User");
     assert_eq!(response_json["subject"], "Test Invoice");
 }
 
 #[tokio::test]
 async fn invoice_with_image_returns_attachment_info() {
-    let app = create_test_app().await;
+    let server = create_test_server().await;
     let invoice = invoice_with_attachment_descriptions(vec!["Test image"]);
     let image_data = load_test_file("test.jpg");
-    let request = create_invoice_request_with_file(&invoice, "test.jpg", image_data);
+    let form = create_invoice_form_with_file(&invoice, "test.jpg", image_data);
 
-    let response = app.oneshot(request).await.unwrap();
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
 
-    assert_eq!(response.status(), StatusCode::CREATED);
-
-    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
     let attachments = response_json["attachments"].as_array().unwrap();
     assert_eq!(attachments.len(), 1);
     assert_eq!(attachments[0]["filename"], "test.jpg");
@@ -47,18 +49,19 @@ async fn invoice_with_image_returns_attachment_info() {
 
 #[tokio::test]
 async fn invoice_with_pdf_attachment_returns_attachment_info() {
-    let app = create_test_app().await;
+    let server = create_test_server().await;
     let invoice = invoice_with_attachment_descriptions(vec!["Receipt"]);
     let pdf_data = load_test_file("test.pdf");
-    let request = create_invoice_request_with_file(&invoice, "receipt.pdf", pdf_data);
+    let form = create_invoice_form_with_file(&invoice, "receipt.pdf", pdf_data);
 
-    let response = app.oneshot(request).await.unwrap();
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
 
-    assert_eq!(response.status(), StatusCode::CREATED);
-
-    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
     let attachments = response_json["attachments"].as_array().unwrap();
     assert_eq!(attachments.len(), 1);
     assert_eq!(attachments[0]["filename"], "receipt.pdf");
@@ -66,44 +69,45 @@ async fn invoice_with_pdf_attachment_returns_attachment_info() {
 
 #[tokio::test]
 async fn invoice_with_multiple_attachments_returns_all_attachment_info() {
-    let app = create_test_app().await;
+    let server = create_test_server().await;
     let invoice = invoice_with_attachment_descriptions(vec!["Image", "Document"]);
     let jpg_data = load_test_file("test.jpg");
     let pdf_data = load_test_file("test.pdf");
-
-    let request = common::multipart::create_invoice_request_with_files(
+    let form = create_invoice_form_with_files(
         &invoice,
         vec![("photo.jpg", jpg_data), ("document.pdf", pdf_data)],
     );
 
-    let response = app.oneshot(request).await.unwrap();
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
 
-    assert_eq!(response.status(), StatusCode::CREATED);
-
-    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
     let attachments = response_json["attachments"].as_array().unwrap();
     assert_eq!(attachments.len(), 2);
 }
 
 #[tokio::test]
 async fn invoice_rows_are_preserved_in_response() {
-    let app = create_test_app().await;
+    let server = create_test_server().await;
     let mut invoice = valid_invoice_json();
     invoice["rows"] = serde_json::json!([
         { "product": "Product A", "unit_price": 1000 },
         { "product": "Product B", "unit_price": 2500 }
     ]);
-    let request = create_invoice_request(&invoice);
+    let form = create_invoice_form(&invoice);
 
-    let response = app.oneshot(request).await.unwrap();
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
 
-    assert_eq!(response.status(), StatusCode::CREATED);
-
-    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
     let rows = response_json["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0]["product"], "Product A");
