@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{fmt::Display, sync::LazyLock};
 
 use crate::error::Error;
 use crate::mailgun::MailgunClient;
@@ -11,7 +11,7 @@ use axum_typed_multipart::{
 use axum_valid::Garde;
 use futures::stream::Stream;
 use garde::Validate;
-use iban::Iban;
+use iban::{Iban, IbanLike};
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -28,13 +28,6 @@ impl TryFromChunks for Invoice {
         let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
 
         serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
-    }
-}
-
-fn is_valid_iban(value: &str, _: &()) -> garde::Result {
-    match value.parse::<Iban>() {
-        Err(e) => Err(garde::Error::new(e)),
-        _ => Ok(()),
     }
 }
 
@@ -69,6 +62,24 @@ pub struct Address {
     pub zip: String,
 }
 
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct IbanElectronicString(String);
+
+impl Display for IbanElectronicString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for IbanElectronicString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Iban::deserialize(deserializer).map(|iban| Self(iban.electronic_str().to_string()))
+    }
+}
+
 /// Body for the request for creating new invoices
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct Invoice {
@@ -81,9 +92,9 @@ pub struct Invoice {
     /// The recipient's address
     #[garde(dive)]
     pub address: Address,
-    /// The recipient's bank account number, must be a valid iban bank account number
-    #[garde(length(chars, max = 128), custom(is_valid_iban))]
-    pub bank_account_number: String,
+    /// The recipient's bank account number, must be a valid IBAN
+    #[garde(skip)]
+    pub bank_account_number: IbanElectronicString,
     /// The subject of the invoice, at least 1 character and at most 128 characters long
     #[garde(length(chars, min = 1, max = 128))]
     pub subject: String,
