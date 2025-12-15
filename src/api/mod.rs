@@ -11,6 +11,7 @@ use tower_governor::{
     GovernorLayer,
 };
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
+use utoipa::openapi::{ContactBuilder, InfoBuilder, OpenApiBuilder};
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -42,9 +43,28 @@ pub fn app() -> Router<crate::state::State> {
         governor_limiter.retain_recent();
     });
 
-    let (router, api) = OpenApiRouter::new()
-        .routes(routes!(health, invoices::create))
-        .split_for_parts();
+    // Customize OpenAPI info
+    let (router, api) = OpenApiRouter::with_openapi(
+        OpenApiBuilder::new()
+            .info(
+                InfoBuilder::new()
+                    .title("Laskugeneraattori API")
+                    .version(env!("CARGO_PKG_VERSION"))
+                    .description(Some("Invoice generation service for Tietokilta"))
+                    .contact(Some(
+                        ContactBuilder::new()
+                            .name(Some("Tietokilta"))
+                            .url(Some(
+                                "https://github.com/Tietokilta/laskugeneraattori/issues",
+                            ))
+                            .build(),
+                    ))
+                    .build(),
+            )
+            .build(),
+    )
+    .routes(routes!(health, invoices::create))
+    .split_for_parts();
 
     Router::new()
         .merge(router)

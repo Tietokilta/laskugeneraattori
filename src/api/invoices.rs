@@ -70,7 +70,7 @@ pub struct Invoice {
     /// The subject of the invoice, at least 1 character and at most 128 characters long
     #[garde(length(chars, min = 1, max = 128))]
     pub subject: String,
-    /// The description of the invoice, maximum length of 128 characters
+    /// The description of the invoice, maximum length of 4096 characters
     #[garde(length(chars, max = 4096))]
     pub description: String,
     /// The recipient's phone number, maximum length of 32 characters, must be valid and include
