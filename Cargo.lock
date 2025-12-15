@@ -1722,6 +1722,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f695c602ee9bb55c4100c3e50559461ea3f49ca0d543cf770720af8165dc756"
 dependencies = [
  "arrayvec",
+ "serde",
 ]
 
 [[package]]

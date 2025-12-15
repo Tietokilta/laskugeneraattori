@@ -377,3 +377,24 @@ async fn reject_malformed_json() {
         "Expected error response for malformed JSON"
     );
 }
+
+#[tokio::test]
+async fn iban_whitespace_is_stripped() {
+    let server = create_test_server().await;
+    let invoice = valid_invoice_json(); // Uses "FI21 1234 5600 0007 85"
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
+
+    assert_eq!(
+        response_json["bank_account_number"], "FI2112345600000785",
+        "IBAN should be stripped of whitespace"
+    );
+}
