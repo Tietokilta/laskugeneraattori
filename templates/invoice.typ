@@ -73,7 +73,7 @@
 
 #colbreak()
 = LASKU
-*Päivämäärä*: #datetime.today().display() \
+*Päivämäärä*: #datetime.today().display("[day padding:zero].[month padding:zero].[year]") \
 ]
 
 == Tietokilta

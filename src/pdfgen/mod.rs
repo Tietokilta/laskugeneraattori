@@ -1,8 +1,10 @@
 use crate::api::invoices::InvoiceAttachment;
+use crate::api::receipts::Receipt;
 use crate::{api::invoices::Invoice, error::Error};
 use bank_barcode::{Barcode, BarcodeBuilder};
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
+use time_tz::{timezones, ToTimezone};
 use typst::{
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime, IntoValue, Value},
@@ -14,6 +16,10 @@ use typst::{
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
+enum Template {
+    Invoice,
+    Receipt,
+}
 
 #[derive(Clone, Debug)]
 pub struct FontSlot {
@@ -136,6 +142,15 @@ impl Sandbox {
 
         new
     }
+    fn with_template(&self, template: Template) -> Self {
+        let mut new = self.clone();
+        let src = match template {
+            Template::Invoice => include_str!("../../templates/invoice.typ"),
+            Template::Receipt => include_str!("../../templates/receipt.typ"),
+        };
+        new.source = Source::detached(src);
+        new
+    }
 
     fn sandbox_file(&self, id: FileId) -> FileResult<&FileEntry> {
         if let Some(entry) = self.files.get(&id) {
@@ -188,11 +203,17 @@ impl World for Sandbox {
         self.fonts.get(index)?.get()
     }
 
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        let offset = offset.unwrap_or(0);
-        let offset = time::UtcOffset::from_hms(offset.try_into().ok()?, 0, 0).ok()?;
-        let time = self.time.checked_to_offset(offset)?;
-        Some(Datetime::Date(time.date()))
+    fn today(&self, _offset: Option<i64>) -> Option<Datetime> {
+        let time = self.time.to_timezone(timezones::db::europe::HELSINKI);
+
+        Datetime::from_ymd_hms(
+            time.year(),
+            time.month() as u8,
+            time.day(),
+            time.hour(),
+            time.minute(),
+            time.second(),
+        )
     }
 }
 
@@ -245,12 +266,12 @@ impl TryFrom<Invoice> for Barcode {
     }
 }
 
-pub struct DocumentBuilder {
+pub struct InvoiceBuilder {
     invoice: Invoice,
     attachments: Vec<InvoiceAttachment>,
 }
 
-impl DocumentBuilder {
+impl InvoiceBuilder {
     pub fn new(invoice: Invoice, attachments: Vec<InvoiceAttachment>) -> Self {
         Self {
             invoice,
@@ -284,7 +305,10 @@ impl DocumentBuilder {
     }
 
     pub fn build_with_pdfs(self) -> Result<(PagedDocument, Vec<InvoiceAttachment>), Error> {
-        let mut w = WORLD.clone().with_data(self.data());
+        let mut w = WORLD
+            .clone()
+            .with_template(Template::Invoice)
+            .with_data(self.data());
 
         let pdfs = self
             .attachments
@@ -312,6 +336,57 @@ impl DocumentBuilder {
 
         match output {
             Ok(template) => Ok((template, pdfs)),
+            Err(err) => Err(Error::TypstError(
+                err.into_iter()
+                    .map(|e| e.message.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )),
+        }
+    }
+}
+
+pub struct ReceiptBuilder {
+    receipt: Receipt,
+}
+
+impl ReceiptBuilder {
+    pub fn new(receipt: Receipt) -> Self {
+        Self { receipt }
+    }
+
+    // FIXME: this is very ugly
+    fn data(&self) -> Value {
+        let value: serde_json::Value = serde_json::from_str(
+            serde_json::to_string(&self.receipt)
+                .expect("BUG: serializing receipt failed")
+                .as_str(),
+        )
+        .expect("BUG: deserializing receipt failed");
+
+        serde_json::from_str(&value.to_string())
+            .expect("BUG: failed to deserialize into typst::Value")
+    }
+
+    #[allow(dead_code)]
+    pub fn build(self) -> Result<PagedDocument, Error> {
+        self.build_with_pdfs()
+    }
+
+    pub fn build_with_pdfs(self) -> Result<PagedDocument, Error> {
+        let w = WORLD
+            .clone()
+            .with_template(Template::Receipt)
+            .with_data(self.data());
+
+        let typst::diag::Warned {
+            output,
+            warnings: _,
+        } = typst::compile(&w);
+        println!("output: {output:?}");
+
+        match output {
+            Ok(template) => Ok(template),
             Err(err) => Err(Error::TypstError(
                 err.into_iter()
                     .map(|e| e.message.to_string())

@@ -1,3 +1,4 @@
+use axum::routing::{get, post};
 use axum::{
     extract::DefaultBodyLimit,
     http::{HeaderValue, Method, Request},
@@ -8,13 +9,14 @@ use std::time::Duration;
 use tower_governor::{governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorLayer};
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
 use utoipa::openapi::{ContactBuilder, InfoBuilder, OpenApiBuilder};
-use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{api::key_extractor::IpExtractor, CONFIG};
 
 pub mod invoices;
 mod key_extractor;
+pub mod receipts;
 
 pub fn app() -> Router<crate::state::State> {
     let cors_layer = CorsLayer::new().allow_origin(
@@ -68,7 +70,9 @@ pub fn app() -> Router<crate::state::State> {
             )
             .build(),
     )
-    .routes(routes!(health, invoices::create))
+    .route("/health", get(health))
+    .route("/invoices", post(invoices::create_invoice))
+    .route("/receipts", post(receipts::create_receipt))
     .split_for_parts();
 
     Router::new()

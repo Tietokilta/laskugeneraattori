@@ -76,7 +76,7 @@ pub struct Invoice {
     #[garde(length(chars, max = 128))]
     pub recipient_name: String,
     /// The recipient's email, maximum length of 128 characters
-    #[garde(length(chars, max = 128))]
+    #[garde(length(chars, max = 320))]
     pub recipient_email: String,
     /// The recipient's address
     #[garde(dive)]
@@ -162,11 +162,11 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
         (status = 201, body = Invoice)
     )
 )]
-pub async fn create(
+pub async fn create_invoice(
     client: Option<MailgunClient>,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<(StatusCode, axum::Json<Invoice>), Error> {
-    use crate::pdfgen::DocumentBuilder;
+    use crate::pdfgen::InvoiceBuilder;
 
     let attachments: Vec<InvoiceAttachment> =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
@@ -184,7 +184,7 @@ pub async fn create(
     // PDF compilation is heavily blocking
     let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
         let (document, attached_pdfs) =
-            DocumentBuilder::new(inner_data, attachments).build_with_pdfs()?;
+            InvoiceBuilder::new(inner_data, attachments).build_with_pdfs()?;
 
         let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
