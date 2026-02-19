@@ -1,4 +1,3 @@
-use crate::api::utils;
 use crate::error::Error;
 use axum::body::Bytes;
 use axum::http::{header, StatusCode};
@@ -18,7 +17,9 @@ impl TryFromChunks for Receipt {
         chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
         metadata: FieldMetadata,
     ) -> Result<Self, TypedMultipartError> {
-        utils::handle_chunks(chunks, metadata).await
+        let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
+
+        serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
