@@ -16,6 +16,7 @@ use typst::{
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
+
 enum Template {
     Invoice,
     Receipt,
@@ -80,7 +81,6 @@ fn fonts() -> (FontBook, Vec<FontSlot>) {
             })
         }
     }
-
     (book, fonts)
 }
 
@@ -217,42 +217,27 @@ impl World for Sandbox {
     }
 }
 
-impl IntoValue for Invoice {
-    fn into_value(self) -> typst::foundations::Value {
-        serde_json::from_str(&serde_json::to_string(&self).unwrap()).unwrap()
-    }
+/// Serialize a value to JSON and then deserialize into a typst `Value`.
+fn to_typst_value(value: &impl serde::Serialize) -> Value {
+    let json = serde_json::to_string(value).expect("BUG: serialization failed");
+    serde_json::from_str(&json).expect("BUG: failed to deserialize into typst::Value")
 }
 
-impl TryInto<PagedDocument> for Invoice {
-    type Error = Error;
+/// Compile a `Sandbox` world into a `PagedDocument`, mapping typst diagnostics to `Error`.
+fn compile_world(w: &Sandbox) -> Result<PagedDocument, Error> {
+    let typst::diag::Warned {
+        output,
+        warnings: _,
+    } = typst::compile(w);
 
-    fn try_into(self) -> Result<PagedDocument, Error> {
-        let mut w = WORLD.clone().with_data(self.clone());
-        self.attachments.into_iter().for_each(|a| {
-            w.files.insert(
-                FileId::new(
-                    None,
-                    VirtualPath::new("/attachments/".to_owned() + &a.filename),
-                ),
-                FileEntry::new(a.bytes, None),
-            );
-        });
-
-        let typst::diag::Warned {
-            output,
-            warnings: _,
-        } = typst::compile(&w);
-
-        match output {
-            Ok(template) => Ok(template),
-            Err(err) => Err(Error::TypstError(
-                err.into_iter()
-                    .map(|e| e.message.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )),
-        }
-    }
+    output.map_err(|err| {
+        Error::TypstError(
+            err.into_iter()
+                .map(|e| e.message.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    })
 }
 
 impl TryFrom<Invoice> for Barcode {
@@ -279,24 +264,18 @@ impl InvoiceBuilder {
         }
     }
 
-    // FIXME: this is very ugly
     fn data(&self) -> Value {
-        let mut value: serde_json::Value = serde_json::from_str(
-            serde_json::to_string(&self.invoice)
-                .expect("BUG: serializing invoice failed")
-                .as_str(),
-        )
-        .expect("BUG: deserializing invoice failed");
+        let mut value = to_typst_value(&self.invoice);
 
-        let barcode = Barcode::try_from(self.invoice.clone());
+        // Inject the barcode field into the typst value
+        if let Value::Dict(ref mut dict) = value {
+            let barcode = Barcode::try_from(self.invoice.clone())
+                .map(|b| b.to_string())
+                .unwrap_or_default();
+            dict.insert("barcode".into(), Value::Str(barcode.into()));
+        }
 
-        value["barcode"] = barcode
-            .map(|barcode| barcode.to_string())
-            .unwrap_or_default()
-            .into();
-
-        serde_json::from_str(&value.to_string())
-            .expect("BUG: failed to deserialize into typst::Value")
+        value
     }
 
     #[allow(dead_code)]
@@ -314,9 +293,7 @@ impl InvoiceBuilder {
             .attachments
             .into_iter()
             .filter_map(|a| {
-                if a.filename.to_lowercase().ends_with(".pdf") {
-                    Some(a)
-                } else {
+                if !a.filename.to_lowercase().ends_with(".pdf") {
                     w.files.insert(
                         FileId::new(
                             None,
@@ -324,25 +301,14 @@ impl InvoiceBuilder {
                         ),
                         FileEntry::new(a.bytes, None),
                     );
-                    None
-                }
+                    return None;
+                };
+                Some(a)
             })
             .collect::<Vec<_>>();
 
-        let typst::diag::Warned {
-            output,
-            warnings: _,
-        } = typst::compile(&w);
-
-        match output {
-            Ok(template) => Ok((template, pdfs)),
-            Err(err) => Err(Error::TypstError(
-                err.into_iter()
-                    .map(|e| e.message.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )),
-        }
+        let document = compile_world(&w)?;
+        Ok((document, pdfs))
     }
 }
 
@@ -355,44 +321,12 @@ impl ReceiptBuilder {
         Self { receipt }
     }
 
-    // FIXME: this is very ugly
-    fn data(&self) -> Value {
-        let value: serde_json::Value = serde_json::from_str(
-            serde_json::to_string(&self.receipt)
-                .expect("BUG: serializing receipt failed")
-                .as_str(),
-        )
-        .expect("BUG: deserializing receipt failed");
-
-        serde_json::from_str(&value.to_string())
-            .expect("BUG: failed to deserialize into typst::Value")
-    }
-
-    #[allow(dead_code)]
     pub fn build(self) -> Result<PagedDocument, Error> {
-        self.build_with_pdfs()
-    }
-
-    pub fn build_with_pdfs(self) -> Result<PagedDocument, Error> {
         let w = WORLD
             .clone()
             .with_template(Template::Receipt)
-            .with_data(self.data());
+            .with_data(to_typst_value(&self.receipt));
 
-        let typst::diag::Warned {
-            output,
-            warnings: _,
-        } = typst::compile(&w);
-        println!("output: {output:?}");
-
-        match output {
-            Ok(template) => Ok(template),
-            Err(err) => Err(Error::TypstError(
-                err.into_iter()
-                    .map(|e| e.message.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )),
-        }
+        compile_world(&w)
     }
 }

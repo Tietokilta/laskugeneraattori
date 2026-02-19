@@ -17,6 +17,7 @@ use crate::{api::key_extractor::IpExtractor, CONFIG};
 pub mod invoices;
 mod key_extractor;
 pub mod receipts;
+pub mod utils;
 
 pub fn app() -> Router<crate::state::State> {
     let cors_layer = CorsLayer::new().allow_origin(

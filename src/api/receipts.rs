@@ -1,3 +1,4 @@
+use crate::api::utils;
 use crate::error::Error;
 use axum::body::Bytes;
 use axum::http::{header, StatusCode};
@@ -17,9 +18,7 @@ impl TryFromChunks for Receipt {
         chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
         metadata: FieldMetadata,
     ) -> Result<Self, TypedMultipartError> {
-        let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
-
-        serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
+        utils::handle_chunks(chunks, metadata).await
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
@@ -30,7 +29,7 @@ pub struct Receipt {
     #[garde(length(chars, max = 128))]
     pub purchaser_name: String,
     /// Email of the purchaser, maximum length of 128 characters
-    #[garde(length(chars, max = 256))]
+    #[garde(length(chars, max = 320))]
     pub purchaser_email: String,
     /// The rows of products in the receipt
     #[garde(length(min = 1), dive)]
@@ -73,7 +72,7 @@ pub async fn create_receipt(
 
     // PDF compilation is heavily blocking
     let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
-        let document = ReceiptBuilder::new(inner_data).build_with_pdfs()?;
+        let document = ReceiptBuilder::new(inner_data).build()?;
 
         let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
