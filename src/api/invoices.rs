@@ -14,31 +14,24 @@ use garde::Validate;
 use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use utoipa::ToSchema;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
 
-#[axum_typed_multipart::async_trait]
-impl TryFromChunks for Invoice {
-    async fn try_from_chunks(
-        chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
-        metadata: FieldMetadata,
-    ) -> Result<Self, TypedMultipartError> {
-        let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
+// --- Validation helpers ---
 
-        serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
-    }
-}
-
-pub fn is_valid_iban(value: &str, _: &()) -> garde::Result {
+fn is_valid_iban(value: &str, _: &()) -> garde::Result {
     match value.parse::<Iban>() {
         Err(e) => Err(garde::Error::new(e)),
         _ => Ok(()),
     }
 }
 
-pub fn is_valid_phone_number(value: &str, _: &()) -> garde::Result {
+fn is_valid_phone_number(value: &str, _: &()) -> garde::Result {
     use phonenumber::country::Id;
     // Works if number is in international format
     if phonenumber::parse(None, value)
@@ -54,6 +47,8 @@ pub fn is_valid_phone_number(value: &str, _: &()) -> garde::Result {
         _ => Err(garde::Error::new("Invalid phone number")),
     }
 }
+
+// --- Types ---
 
 /// An address consisting of a street, a city and a zipcode
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
@@ -75,13 +70,13 @@ pub struct Invoice {
     /// The recipient's name, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub recipient_name: String,
-    /// The recipient's email, maximum length of 128 characters
+    /// The recipient's email, maximum length of 320 characters
     #[garde(length(chars, max = 320))]
     pub recipient_email: String,
     /// The recipient's address
     #[garde(dive)]
     pub address: Address,
-    /// The recipient's bank account number, must be a valid iban bank account number
+    /// The recipient's bank account number, must be a valid IBAN
     #[garde(length(chars, max = 128), custom(is_valid_iban))]
     pub bank_account_number: String,
     /// The subject of the invoice, at least 1 character and at most 128 characters long
@@ -90,8 +85,7 @@ pub struct Invoice {
     /// The description of the invoice, maximum length of 4096 characters
     #[garde(length(chars, max = 4096))]
     pub description: String,
-    /// The recipient's phone number, maximum length of 32 characters, must be valid and include
-    /// the counter prefix (e.g. +358)
+    /// The recipient's phone number, must be valid and include the country prefix (e.g. +358)
     #[garde(length(chars, max = 32), custom(is_valid_phone_number))]
     pub phone_number: String,
     /// A list of descriptions for the attached files, each with the maximum length of 512
@@ -105,6 +99,17 @@ pub struct Invoice {
     #[garde(skip)]
     #[serde(skip_deserializing)]
     pub attachments: Vec<InvoiceAttachment>,
+}
+
+#[axum_typed_multipart::async_trait]
+impl TryFromChunks for Invoice {
+    async fn try_from_chunks(
+        chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
+        metadata: FieldMetadata,
+    ) -> Result<Self, TypedMultipartError> {
+        let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
+        serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
+    }
 }
 
 #[derive(TryFromMultipart, Validate, ToSchema)]
@@ -125,7 +130,7 @@ pub struct InvoiceRow {
     /// The product can be at most 128 characters
     #[garde(length(chars, max = 128))]
     pub product: String,
-    /// Unit price is encoded as number of cents to avoid floating-point precision bugs
+    /// Unit price is encoded as number of cents to avoid floating-point precision bugs,
     /// must be positive
     #[garde(range(min = 1))]
     pub unit_price: i32,
@@ -155,9 +160,11 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     })
 }
 
+// --- Handler ---
+
 /// Creates an invoice with the given data and attachments and sends it by email to the treasurer
-#[utoipa::path(post, path = "/invoices", 
-    request_body(content_type = "multipart/form-data", content = InvoiceForm), 
+#[utoipa::path(post, path = "/invoices",
+    request_body(content_type = "multipart/form-data", content = InvoiceForm),
     responses(
         (status = 201, body = Invoice)
     )
@@ -186,29 +193,16 @@ pub async fn create_invoice(
         let (document, attached_pdfs) =
             InvoiceBuilder::new(inner_data, attachments).build_with_pdfs()?;
 
-        let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
+        let mut pdfs = vec![typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap()];
+        pdfs.extend(attached_pdfs.into_iter().map(|a| a.bytes));
 
-        let mut pdfs = vec![pdf];
-        pdfs.extend_from_slice(
-            attached_pdfs
-                .into_iter()
-                .map(|a| a.bytes)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-
-        let pdf = crate::merge::merge_pdf(pdfs)?;
-        Ok(pdf)
+        crate::merge::merge_pdf(pdfs)
     })
     .await??;
 
     if let Some(client) = client {
         client.send_mail(&multipart.data, pdf).await?;
     } else {
-        use tempfile::NamedTempFile;
-        use tokio::fs::File;
-        use tokio::io::AsyncWriteExt;
-
         let tmp = NamedTempFile::with_suffix(".pdf")?;
         let (file, path) = tmp.keep().unwrap();
         let mut file = File::from_std(file);

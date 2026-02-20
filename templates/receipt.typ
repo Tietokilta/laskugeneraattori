@@ -30,8 +30,7 @@
     #image("/tik.png")
   ],
   footer: [
-    Tietokilta ry ei ole arvonlisäverovelvollinen. \
-    Ongelmatapauksissa ota yhteyttä rahastonhoitajaan: #link("mailto:rahastonhoitaja@tietokilta.fi").
+    Tietokilta ry *ei ole* arvonlisäverovelvollinen. Ongelmatapauksissa ota yhteyttä rahastonhoitajaan: #link("mailto:rahastonhoitaja@tietokilta.fi").
     Tarkemmat yhteystiedot löydät killan sivuilta.
 
     #v(1em)
