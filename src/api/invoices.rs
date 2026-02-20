@@ -48,8 +48,6 @@ fn is_valid_phone_number(value: &str, _: &()) -> garde::Result {
     }
 }
 
-// --- Types ---
-
 /// An address consisting of a street, a city and a zipcode
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct Address {
@@ -76,7 +74,7 @@ pub struct Invoice {
     /// The recipient's address
     #[garde(dive)]
     pub address: Address,
-    /// The recipient's bank account number, must be a valid IBAN
+    /// The recipient's bank account number, must be a valid iban bank account number
     #[garde(length(chars, max = 128), custom(is_valid_iban))]
     pub bank_account_number: String,
     /// The subject of the invoice, at least 1 character and at most 128 characters long
@@ -130,7 +128,7 @@ pub struct InvoiceRow {
     /// The product can be at most 128 characters
     #[garde(length(chars, max = 128))]
     pub product: String,
-    /// Unit price is encoded as number of cents to avoid floating-point precision bugs,
+    /// Unit price is encoded as number of cents to avoid floating-point precision bugs
     /// must be positive
     #[garde(range(min = 1))]
     pub unit_price: i32,
@@ -159,8 +157,6 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
         bytes: field.contents.to_vec(),
     })
 }
-
-// --- Handler ---
 
 /// Creates an invoice with the given data and attachments and sends it by email to the treasurer
 #[utoipa::path(post, path = "/invoices",
