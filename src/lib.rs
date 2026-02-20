@@ -68,6 +68,8 @@ pub struct LaskugenConfig {
     pub rate_limit_period_secs: u64,
     #[clap(long, env, default_value = "5")]
     pub rate_limit_burst_size: u32,
+    #[clap(long, env)]
+    pub receipt_api_key: Option<String>,
 }
 
 pub static CONFIG: LazyLock<LaskugenConfig> = LazyLock::new(LaskugenConfig::parse);

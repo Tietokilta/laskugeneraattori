@@ -2,9 +2,13 @@ use crate::mailgun::MailgunClient;
 
 use axum::extract::FromRef;
 
+#[derive(Clone)]
+pub struct ReceiptApiKey(pub Option<String>);
+
 #[derive(FromRef, Clone)]
 pub struct State {
     pub mailgun_client: Option<MailgunClient>,
+    pub receipt_api_key: ReceiptApiKey,
     pub for_garde: (),
 }
 
@@ -18,6 +22,7 @@ pub async fn new() -> State {
             }
             res => res.ok(),
         },
+        receipt_api_key: ReceiptApiKey(crate::CONFIG.receipt_api_key.clone()),
         for_garde: (),
     }
 }

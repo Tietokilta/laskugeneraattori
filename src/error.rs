@@ -28,6 +28,8 @@ pub enum Error {
     TypstError(String),
     #[error("Failed to join task")]
     JoinError(#[from] tokio::task::JoinError),
+    #[error("Unauthorized")]
+    Unauthorized,
 }
 
 impl IntoResponse for Error {
@@ -50,6 +52,7 @@ impl IntoResponse for Error {
             | Error::MultipartRejection(_)
             | Error::JsonRejection(_)
             | Error::UnsupportedFileFormat(_) => StatusCode::BAD_REQUEST,
+            Error::Unauthorized => StatusCode::UNAUTHORIZED,
         };
 
         (

@@ -1,6 +1,6 @@
 use crate::error::Error;
 use axum::body::Bytes;
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum_typed_multipart::{
     FieldMetadata, TryFromChunks, TryFromMultipart, TypedMultipart, TypedMultipartError,
@@ -67,9 +67,26 @@ pub struct ReceiptRow {
     )
 )]
 pub async fn create_receipt(
+    axum::extract::State(crate::state::ReceiptApiKey(receipt_api_key)): axum::extract::State<
+        crate::state::ReceiptApiKey,
+    >,
+    headers: HeaderMap,
     Garde(TypedMultipart(multipart)): Garde<TypedMultipart<ReceiptForm>>,
 ) -> Result<Response, Error> {
     use crate::pdfgen::ReceiptBuilder;
+
+    // Require a receipt API key as an environment variable
+    let expected_key = match receipt_api_key.as_deref() {
+        Some(key) => key,
+        None => return Err(Error::Unauthorized),
+    };
+
+    let provided_key = headers.get("RECEIPT_API_KEY").and_then(|v| v.to_str().ok());
+    // Require the provided key to match the expected key
+    match provided_key {
+        Some(key) if key == expected_key => {}
+        _ => return Err(Error::Unauthorized),
+    }
 
     // PDF compilation is heavily blocking
     let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
