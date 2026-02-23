@@ -12,6 +12,12 @@ path = "src/lib.rs"
 name = "laskugeneraattori"
 path = "src/main.rs"
 
+[workspace]
+members = [
+    ".",
+    "receiptgen-node"
+]
+
 [profile.release]
 lto = true
 

@@ -794,6 +794,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "affbf0190ed2caf063e3def54ff444b449371d55c58e513a95ab98eca50adb49"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "cookie"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -897,6 +906,22 @@ checksum = "5efa2b3d7902f4b634a20cae3c9c4e6209dc4779feb6863329607560143efa70"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "ctor"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
+dependencies = [
+ "ctor-proc-macro",
+ "dtor",
+]
+
+[[package]]
+name = "ctor-proc-macro"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
 
 [[package]]
 name = "darling"
@@ -1011,6 +1036,21 @@ name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
+name = "dtor"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "404d02eeb088a82cfd873006cb713fe411306c7d182c344905e101fb1167d301"
+dependencies = [
+ "dtor-proc-macro",
+]
+
+[[package]]
+name = "dtor-proc-macro"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
 
 [[package]]
 name = "ecb"
@@ -2136,6 +2176,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 
 [[package]]
+name = "libloading"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "754ca22de805bb5744484a5b151a9e1a8e837d5dc232c2d7d8c2e3492edc8b60"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2380,6 +2430,69 @@ name = "mutate_once"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16cf681a23b4d0a43fc35024c176437f9dcd818db34e0f42ab456a0ee5ad497b"
+
+[[package]]
+name = "napi"
+version = "3.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6944d0bf100571cd6e1a98a316cdca262deb6fccf8d93f5ae1502ca3fc88bd3"
+dependencies = [
+ "bitflags 2.10.0",
+ "ctor",
+ "futures",
+ "napi-build",
+ "napi-sys",
+ "nohash-hasher",
+ "rustc-hash 2.1.1",
+]
+
+[[package]]
+name = "napi-build"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d376940fd5b723c6893cd1ee3f33abbfd86acb1cd1ec079f3ab04a2a3bc4d3b1"
+
+[[package]]
+name = "napi-derive"
+version = "3.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c914b5e420182bfb73504e0607592cdb8e2e21437d450883077669fb72a114d"
+dependencies = [
+ "convert_case",
+ "ctor",
+ "napi-derive-backend",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.108",
+]
+
+[[package]]
+name = "napi-derive-backend"
+version = "5.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0864cf6a82e2cfb69067374b64c9253d7e910e5b34db833ed7495dda56ccb18"
+dependencies = [
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "semver",
+ "syn 2.0.108",
+]
+
+[[package]]
+name = "napi-sys"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eb602b84d7c1edae45e50bbf1374696548f36ae179dfa667f577e384bb90c2b"
+dependencies = [
+ "libloading",
+]
+
+[[package]]
+name = "nohash-hasher"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "nom"
@@ -2974,7 +3087,7 @@ dependencies = [
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "rustls",
  "thiserror 1.0.63",
  "tokio",
@@ -2990,7 +3103,7 @@ dependencies = [
  "bytes",
  "rand 0.8.5",
  "ring",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "rustls",
  "slab",
  "thiserror 1.0.63",
@@ -3132,6 +3245,17 @@ checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "receiptgen-node"
+version = "0.1.0"
+dependencies = [
+ "garde",
+ "laskugeneraattori",
+ "napi",
+ "napi-derive",
+ "serde_json",
 ]
 
 [[package]]
@@ -3473,6 +3597,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
+name = "rustc-hash"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
+
+[[package]]
 name = "rustix"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3569,6 +3699,12 @@ name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 
 [[package]]
 name = "serde"
