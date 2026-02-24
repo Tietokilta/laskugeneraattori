@@ -3256,6 +3256,7 @@ dependencies = [
  "napi",
  "napi-derive",
  "serde_json",
+ "typst-pdf",
 ]
 
 [[package]]
