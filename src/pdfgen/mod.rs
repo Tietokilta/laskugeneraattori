@@ -293,7 +293,9 @@ impl InvoiceBuilder {
             .attachments
             .into_iter()
             .filter_map(|a| {
-                if !a.filename.to_lowercase().ends_with(".pdf") {
+                if a.filename.to_lowercase().ends_with(".pdf") {
+                    Some(a)
+                } else {
                     w.files.insert(
                         FileId::new(
                             None,
@@ -302,8 +304,7 @@ impl InvoiceBuilder {
                         FileEntry::new(a.bytes, None),
                     );
                     return None;
-                };
-                Some(a)
+                }
             })
             .collect::<Vec<_>>();
 

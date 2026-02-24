@@ -20,7 +20,7 @@ pub mod receipts;
 
 pub fn app() -> Router<crate::state::State> {
     let cors_layer = CorsLayer::new().allow_origin(
-        crate::CONFIG
+        CONFIG
             .allowed_origins
             .iter()
             .map(|c| c.parse::<HeaderValue>().unwrap())

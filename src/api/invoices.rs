@@ -22,7 +22,16 @@ use utoipa::ToSchema;
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
 
-// --- Validation helpers ---
+#[axum_typed_multipart::async_trait]
+impl TryFromChunks for Invoice {
+    async fn try_from_chunks(
+        chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
+        metadata: FieldMetadata,
+    ) -> Result<Self, TypedMultipartError> {
+        let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
+        serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
+    }
+}
 
 fn is_valid_iban(value: &str, _: &()) -> garde::Result {
     match value.parse::<Iban>() {
@@ -97,17 +106,6 @@ pub struct Invoice {
     #[garde(skip)]
     #[serde(skip_deserializing)]
     pub attachments: Vec<InvoiceAttachment>,
-}
-
-#[axum_typed_multipart::async_trait]
-impl TryFromChunks for Invoice {
-    async fn try_from_chunks(
-        chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
-        metadata: FieldMetadata,
-    ) -> Result<Self, TypedMultipartError> {
-        let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
-        serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
-    }
 }
 
 #[derive(TryFromMultipart, Validate, ToSchema)]

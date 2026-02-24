@@ -7,6 +7,7 @@ use axum_typed_multipart::{
 };
 use axum_valid::Garde;
 use futures::Stream;
+use garde::rules::AsStr;
 use garde::Validate;
 use serde_derive::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -67,21 +68,18 @@ pub struct ReceiptRow {
     )
 )]
 pub async fn create_receipt(
-    axum::extract::State(crate::state::ReceiptApiKey(receipt_api_key)): axum::extract::State<
-        crate::state::ReceiptApiKey,
-    >,
     headers: HeaderMap,
     Garde(TypedMultipart(multipart)): Garde<TypedMultipart<ReceiptForm>>,
 ) -> Result<Response, Error> {
     use crate::pdfgen::ReceiptBuilder;
 
     // Require a receipt API key as an environment variable
-    let expected_key = match receipt_api_key.as_deref() {
-        Some(key) => key,
-        None => return Err(Error::Unauthorized),
+    let expected_key = match std::env::var("RECEIPT_API_KEY") {
+        Ok(key) => key,
+        Err(e) => return Err(Error::Unauthorized),
     };
 
-    let provided_key = headers.get("RECEIPT_API_KEY").and_then(|v| v.to_str().ok());
+    let provided_key = headers.get("Authorization").and_then(|v| v.to_str().ok());
     // Require the provided key to match the expected key
     match provided_key {
         Some(key) if key == expected_key => {}
