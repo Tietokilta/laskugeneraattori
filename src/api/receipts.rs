@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::CONFIG;
 use axum::body::Bytes;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -10,6 +11,7 @@ use futures::Stream;
 use garde::rules::AsStr;
 use garde::Validate;
 use serde_derive::{Deserialize, Serialize};
+use std::io;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
@@ -60,11 +62,27 @@ pub struct ReceiptRow {
     pub unit_price: i32,
 }
 
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    let mut parts = value.split_whitespace();
+    let scheme = parts.next()?;
+    let token = parts.next()?;
+    if scheme.eq_ignore_ascii_case("bearer") && parts.next().is_none() {
+        Some(token)
+    } else {
+        None
+    }
+}
+
 /// Creates a receipt PDF from the given data
 #[utoipa::path(post, path = "/receipts",
+    security(
+    ("bearerAuth" = [])
+    ),
     request_body(content_type = "multipart/form-data", content = ReceiptForm),
     responses(
-        (status = 201, description = "Receipt PDF", content_type = "application/pdf")
+        (status = 201, description = "Receipt PDF", content_type = "application/pdf"),
+        (status = 401, description = "Unauthorized"),
     )
 )]
 pub async fn create_receipt(
@@ -74,15 +92,15 @@ pub async fn create_receipt(
     use crate::pdfgen::ReceiptBuilder;
 
     // Require a receipt API key as an environment variable
-    let expected_key = match std::env::var("RECEIPT_API_KEY") {
-        Ok(key) => key,
-        Err(e) => return Err(Error::Unauthorized),
-    };
+    let expected = CONFIG.receipt_api_key.clone().ok_or_else(|| {
+        Error::InternalServerError(io::Error::new(
+            io::ErrorKind::Other,
+            "Receipt API key is not configured",
+        ))
+    })?;
 
-    let provided_key = headers.get("Authorization").and_then(|v| v.to_str().ok());
-    // Require the provided key to match the expected key
-    match provided_key {
-        Some(key) if key == expected_key => {}
+    match bearer_token(&headers) {
+        Some(t) if t == expected => {}
         _ => return Err(Error::Unauthorized),
     }
 

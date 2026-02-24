@@ -8,7 +8,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tower_governor::{governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorLayer};
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
-use utoipa::openapi::{ContactBuilder, InfoBuilder, OpenApiBuilder};
+use utoipa::openapi::{
+    security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    ComponentsBuilder, ContactBuilder, InfoBuilder, OpenApiBuilder,
+};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -68,6 +71,16 @@ pub fn app() -> Router<crate::state::State> {
                     ))
                     .build(),
             )
+            .components(Some(
+                ComponentsBuilder::new()
+                    .security_scheme(
+                        "bearerAuth",
+                        SecurityScheme::Http(
+                            HttpBuilder::new().scheme(HttpAuthScheme::Bearer).build(),
+                        ),
+                    )
+                    .build(),
+            ))
             .build(),
     )
     .route("/health", get(health))
