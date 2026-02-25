@@ -96,10 +96,7 @@ pub async fn create_receipt(
             "No API key configured for {}",
             CONFIG.receipt_api_key.clone().unwrap()
         );
-        Error::InternalServerError(io::Error::new(
-            io::ErrorKind::Other,
-            "Receipt API key is not configured",
-        ))
+        Error::InternalServerError(io::Error::other("Receipt API key is not configured"))
     })?;
 
     match bearer_token(&headers) {

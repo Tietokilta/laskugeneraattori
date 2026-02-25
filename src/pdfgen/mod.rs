@@ -307,7 +307,7 @@ impl InvoiceBuilder {
                         ),
                         FileEntry::new(a.bytes, None),
                     );
-                    return None;
+                    None
                 }
             })
             .collect::<Vec<_>>();
