@@ -2,9 +2,6 @@ use crate::mailgun::MailgunClient;
 
 use axum::extract::FromRef;
 
-#[derive(Clone)]
-pub struct ReceiptApiKey(pub Option<String>);
-
 #[derive(FromRef, Clone)]
 pub struct State {
     pub mailgun_client: Option<MailgunClient>,
