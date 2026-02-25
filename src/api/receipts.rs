@@ -8,7 +8,6 @@ use axum_typed_multipart::{
 };
 use axum_valid::Garde;
 use futures::Stream;
-use garde::rules::AsStr;
 use garde::Validate;
 use serde_derive::{Deserialize, Serialize};
 use std::io;
@@ -93,6 +92,7 @@ pub async fn create_receipt(
 
     // Require a receipt API key as an environment variable
     let expected = CONFIG.receipt_api_key.clone().ok_or_else(|| {
+        tracing::error!("No API key configured for {}", CONFIG.receipt_api_key.clone().unwrap());
         Error::InternalServerError(io::Error::new(
             io::ErrorKind::Other,
             "Receipt API key is not configured",

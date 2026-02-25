@@ -139,6 +139,10 @@ impl Sandbox {
             FileId::new(None, VirtualPath::new("/tik.png")),
             FileEntry::new(include_bytes!("../../templates/tik.png").to_vec(), None),
         );
+        new.files.insert(
+            FileId::new(None, VirtualPath::new("/lib.typ")),
+            FileEntry::new(include_bytes!("../../templates/lib.typ").to_vec(), None),
+        );
 
         new
     }

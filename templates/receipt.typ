@@ -1,11 +1,17 @@
-#import "lib.typ": price, percentage, default_page
+#import "lib.typ": price, percentage, page_background, generator_footer
 
-#default_page([
+#let extra_footer = [
   Tietokilta ry *ei ole* arvonlisäverovelvollinen.
   Ongelmatapauksissa ota yhteyttä rahastonhoitajaan:
   #link("mailto:rahastonhoitaja@tietokilta.fi").
   Tarkemmat yhteystiedot löydät killan sivuilta.
-])
+]
+
+#set page(
+  background: page_background,
+  footer: [#extra_footer #generator_footer],
+  footer-descent: -0.5em,
+)
 
 = KUITTI
 #v(10pt)
