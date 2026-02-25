@@ -92,7 +92,10 @@ pub async fn create_receipt(
 
     // Require a receipt API key as an environment variable
     let expected = CONFIG.receipt_api_key.clone().ok_or_else(|| {
-        tracing::error!("No API key configured for {}", CONFIG.receipt_api_key.clone().unwrap());
+        tracing::error!(
+            "No API key configured for {}",
+            CONFIG.receipt_api_key.clone().unwrap()
+        );
         Error::InternalServerError(io::Error::new(
             io::ErrorKind::Other,
             "Receipt API key is not configured",
