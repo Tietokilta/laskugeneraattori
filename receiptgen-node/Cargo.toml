@@ -2,7 +2,7 @@
 name = "receiptgen-node"
 version = "0.1.0"
 edition = "2021"
-authors = ["Luukas Pörtfors <lajp@iki.fi>"]
+authors = ["Lasse Kukkula <lasse.kukkula@tietokilta.fi>"]
 
 [lib]
 crate-type = ["cdylib"]
