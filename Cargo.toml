@@ -24,9 +24,9 @@ system_fonts = ["dep:fontdb"]
 [dependencies]
 axum = { version = "0.8.6", features = ["macros", "multipart"] }
 axum-valid = { version = "0.24.0", features = [
-    "basic",
-    "full_garde",
-    "typed_multipart",
+  "basic",
+  "full_garde",
+  "typed_multipart",
 ], default-features = false }
 axum_typed_multipart = "0.16.4"
 bank-barcode = "0.1.0"
@@ -40,7 +40,10 @@ iban_validate = "5.0.1"
 lopdf = { version = "0.38.0" }
 phonenumber = "0.3.7"
 regex = "1.12.2"
-reqwest = { version = "0.12.24", default-features = false, features = ["multipart", "rustls-tls"] }
+reqwest = { version = "0.12.24", default-features = false, features = [
+  "multipart",
+  "rustls-tls",
+] }
 serde = "1.0.228"
 serde_derive = "1.0.228"
 serde_json = "1.0.145"
@@ -49,7 +52,9 @@ thiserror = "2.0.17"
 time = { version = "0.3.44" }
 tokio = { version = "1.48.0", features = ["full"] }
 tower-http = { version = "0.6.6", features = ["trace", "limit", "cors"] }
-tower_governor = { git = "https://github.com/lajp/tower-governor", branch = "x-forwarder-for-ports", features = ["axum"] }
+tower_governor = { git = "https://github.com/lajp/tower-governor", branch = "x-forwarder-for-ports", features = [
+  "axum",
+] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 typst = { version = "0.13.1" }

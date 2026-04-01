@@ -90,6 +90,7 @@
             commonArgs
             // {
               inherit cargoArtifacts;
+              GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
               MAILGUN_URL = "https://api.eu.mailgun.net/v3/laskutus.tietokilta.fi/messages";
               MAILGUN_USER = "api";
               MAILGUN_PASSWORD = "password";

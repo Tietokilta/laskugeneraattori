@@ -1,6 +1,6 @@
-use laskugeneraattori::{api, state, CONFIG};
+use laskugeneraattori::{CONFIG, api, state};
 use std::net::SocketAddr;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[cfg(test)]
 mod tests;
