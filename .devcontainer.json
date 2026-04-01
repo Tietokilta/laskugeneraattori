@@ -7,7 +7,7 @@
       ]
     }
   },
-  "image": "ghcr.io/cachix/devenv/devcontainer:latest",
+  "image": "nixos/nix:latest",
   "overrideCommand": false,
-  "updateContentCommand": "devenv test"
+  "updateContentCommand": "nix develop --extra-experimental-features 'nix-command flakes'"
 }

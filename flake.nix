@@ -9,12 +9,10 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    devenv.url = "github:cachix/devenv";
-  };
-
-  nixConfig = {
-    extra-trusted-public-keys = "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=";
-    extra-substituters = "https://devenv.cachix.org";
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -24,9 +22,9 @@
       crane,
       flake-utils,
       fenix,
-      devenv,
+      treefmt-nix,
       ...
-    }@inputs:
+    }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -35,13 +33,10 @@
           overlays = [ fenix.overlays.default ];
         };
 
-        toolchain =
-          with fenix.packages.${system};
-          combine [
-            stable.rustc
-            stable.cargo
-            targets.x86_64-unknown-linux-musl.stable.rust-std
-          ];
+        toolchain = fenix.packages.${system}.fromToolchainFile {
+          file = ./rust-toolchain.toml;
+          sha256 = "sha256-zC8E38iDVJ1oPIzCqTk/Ujo9+9kx9dXq7wAwPMpkpg0=";
+        };
 
         lib = pkgs.lib;
 
@@ -61,8 +56,6 @@
 
           strictDeps = true;
 
-          GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
-
           CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
 
           buildInputs = lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
@@ -70,39 +63,60 @@
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        laskugeneraattori = craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
+        laskugeneraattori = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
+          }
+        );
+
+        treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
       in
       {
+        formatter = treefmtEval.config.build.wrapper;
+
         checks = {
           inherit laskugeneraattori;
+
+          laskugeneraattori-clippy = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+            }
+          );
+
+          laskugeneraattori-test = craneLib.cargoTest (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              MAILGUN_URL = "https://api.eu.mailgun.net/v3/laskutus.tietokilta.fi/messages";
+              MAILGUN_USER = "api";
+              MAILGUN_PASSWORD = "password";
+              MAILGUN_TO = "Rahastonhoitaja <rahastonhoitaja@tietokilta.fi>";
+              MAILGUN_FROM = "noreply@laskutus.tietokilta.fi";
+            }
+          );
+
+          formatting = treefmtEval.config.build.check self;
         };
 
         packages = {
           default = laskugeneraattori;
           docker = pkgs.dockerTools.buildLayeredImage {
             name = "laskugeneraattori";
-            config.Cmd = [ "${laskugeneraattori}/bin/laskugeneraattori" ];
+            tag = "latest";
+            config = {
+              Cmd = [ "${laskugeneraattori}/bin/laskugeneraattori" ];
+              Env = [ "BIND_ADDR=0.0.0.0" ];
+              ExposedPorts."3000/tcp" = { };
+            };
           };
         };
 
-        devShells.default = devenv.lib.mkShell {
-          inherit inputs pkgs;
-          modules = [
-            {
-              languages.rust = {
-                enable = true;
-                inherit toolchain;
-              };
-
-              devcontainer = {
-                enable = true;
-                settings.customizations.vscode.extensions = [
-                  "mkhl.direnv"
-                  "rust-lang.rust-analyzer"
-                ];
-              };
-            }
-          ];
+        devShells.default = craneLib.devShell {
+          checks = self.checks.${system};
+          packages = [ ];
         };
       }
     );
