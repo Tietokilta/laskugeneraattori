@@ -1,8 +1,8 @@
 use std::net::IpAddr;
 
 use tower_governor::{
-    key_extractor::{KeyExtractor, PeerIpKeyExtractor},
     GovernorError,
+    key_extractor::{KeyExtractor, PeerIpKeyExtractor},
 };
 
 #[derive(Copy, Clone)]

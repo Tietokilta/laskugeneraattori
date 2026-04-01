@@ -4,13 +4,13 @@ use bank_barcode::{Barcode, BarcodeBuilder};
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
+    Library, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime, IntoValue, Value},
     layout::PagedDocument,
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, World,
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
