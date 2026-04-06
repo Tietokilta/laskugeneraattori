@@ -11,7 +11,7 @@ use axum_typed_multipart::{
 use axum_valid::Garde;
 use futures::stream::Stream;
 use garde::Validate;
-use iban::{Iban, IbanLike};
+use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -76,8 +76,18 @@ impl<'de> serde::Deserialize<'de> for IbanElectronicString {
     where
         D: serde::Deserializer<'de>,
     {
-        Iban::deserialize(deserializer).map(|iban| Self(iban.electronic_str().to_string()))
+        let s = String::deserialize(deserializer)?;
+        let stripped: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+        Ok(Self(stripped))
     }
+}
+
+fn is_valid_iban(value: &IbanElectronicString, _: &()) -> garde::Result {
+    value
+        .0
+        .parse::<Iban>()
+        .map_err(|e| garde::Error::new(e.to_string()))?;
+    Ok(())
 }
 
 /// Body for the request for creating new invoices
@@ -93,7 +103,7 @@ pub struct Invoice {
     #[garde(dive)]
     pub address: Address,
     /// The recipient's bank account number, must be a valid IBAN
-    #[garde(skip)]
+    #[garde(custom(is_valid_iban))]
     pub bank_account_number: IbanElectronicString,
     /// The subject of the invoice, at least 1 character and at most 128 characters long
     #[garde(length(chars, min = 1, max = 128))]
