@@ -135,6 +135,12 @@ pub struct InvoiceRow {
 pub struct InvoiceAttachment {
     pub filename: String,
     pub bytes: Vec<u8>,
+    #[serde(default = "default_pages")]
+    pub pages: usize,
+}
+
+fn default_pages() -> usize {
+    1
 }
 
 fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> {
@@ -152,6 +158,7 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     Ok(InvoiceAttachment {
         filename,
         bytes: field.contents.to_vec(),
+        pages: 1,
     })
 }
 
@@ -173,9 +180,17 @@ pub async fn create(
 
     multipart.data.attachments = attachments
         .iter()
-        .map(|a| InvoiceAttachment {
-            filename: a.filename.clone(),
-            bytes: vec![],
+        .map(|a| {
+            let pages = if a.filename.to_lowercase().ends_with(".pdf") {
+                crate::pdfgen::count_pdf_pages(&a.bytes)
+            } else {
+                1
+            };
+            InvoiceAttachment {
+                filename: a.filename.clone(),
+                bytes: vec![],
+                pages,
+            }
         })
         .collect();
 
@@ -207,43 +222,4 @@ pub async fn create(
     }
 
     Ok((StatusCode::CREATED, axum::Json(multipart.data)))
-}
-
-#[cfg(not(feature = "email"))]
-pub async fn create(
-    Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
-) -> Result<axum::response::Response, Error> {
-    use tempfile::NamedTempFile;
-    use tokio::fs::File;
-    use tokio::io::AsyncWriteExt;
-
-    use crate::pdfgen::DocumentBuilder;
-
-    let attachments: Vec<InvoiceAttachment> =
-        Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
-
-    multipart.data.attachments = attachments
-        .iter()
-        .map(|a| InvoiceAttachment {
-            filename: a.filename.clone(),
-            bytes: vec![],
-        })
-        .collect();
-
-    let document = DocumentBuilder::new(multipart.data.clone(), attachments).build()?;
-
-    let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
-
-    let tmp = NamedTempFile::with_suffix(".pdf")?;
-    let (file, path) = tmp.keep().unwrap();
-    let mut file = File::from_std(file);
-    file.write_all(&pdf).await?;
-
-    info!("Wrote invoice to {:?}", path);
-
-    Ok(axum::response::Response::builder()
-        .status(StatusCode::CREATED)
-        .header("Content-Type", "application/pdf")
-        .body(Bytes::from(pdf).into())
-        .unwrap())
 }

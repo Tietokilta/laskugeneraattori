@@ -114,5 +114,7 @@
 )
 
 #for file in data.attachments {
-  image("/attachments/" + file.filename)
+  for page in range(1, file.pages + 1) {
+    image("/attachments/" + file.filename, page: page)
+  }
 }

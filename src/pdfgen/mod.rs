@@ -1,7 +1,7 @@
 use crate::api::invoices::InvoiceAttachment;
 use crate::{api::invoices::Invoice, error::Error};
 use bank_barcode::{Barcode, BarcodeBuilder};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
     Library, LibraryExt, World,
@@ -12,6 +12,13 @@ use typst::{
     text::{Font, FontBook},
     utils::LazyHash,
 };
+
+pub fn count_pdf_pages(bytes: &[u8]) -> usize {
+    let data: hayro_syntax::PdfData = Arc::new(bytes.to_vec());
+    hayro_syntax::Pdf::new(data)
+        .map(|pdf| pdf.pages().len())
+        .unwrap_or(1)
+}
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
 
