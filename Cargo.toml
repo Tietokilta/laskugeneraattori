@@ -57,9 +57,9 @@ tower_governor = { git = "https://github.com/lajp/tower-governor", branch = "x-f
 ] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-typst = { version = "0.13.1" }
-typst-assets = { version = "0.14.0", features = ["fonts"] }
-typst-pdf = { version = "0.13.1" }
+typst = { version = "0.14.0-rc.2" }
+typst-assets = { version = "0.13.0-rc.2", features = ["fonts"] }
+typst-pdf = { version = "0.14.0-rc.2" }
 utoipa = { version = "5.4.0", features = ["axum_extras"] }
 utoipa-axum = "0.2.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }

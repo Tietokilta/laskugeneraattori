@@ -4,7 +4,7 @@ use bank_barcode::{Barcode, BarcodeBuilder};
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
-    Library, World,
+    Library, LibraryExt, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime, IntoValue, Value},
     layout::PagedDocument,
