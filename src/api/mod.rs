@@ -1,17 +1,17 @@
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
     http::{HeaderValue, Method, Request},
-    Router,
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tower_governor::{governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorLayer};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder, key_extractor::KeyExtractor};
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
 use utoipa::openapi::{ContactBuilder, InfoBuilder, OpenApiBuilder};
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{api::key_extractor::IpExtractor, CONFIG};
+use crate::{CONFIG, api::key_extractor::IpExtractor};
 
 pub mod invoices;
 mod key_extractor;
@@ -43,9 +43,11 @@ pub fn app() -> Router<crate::state::State> {
     );
     let governor_limiter = governor_config.limiter().clone();
 
-    std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_secs(60));
-        governor_limiter.retain_recent();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_secs(60));
+            governor_limiter.retain_recent();
+        }
     });
 
     // Customize OpenAPI info

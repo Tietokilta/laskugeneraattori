@@ -17,7 +17,7 @@ use serde_derive::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|webp|pdf)$").unwrap());
 
 #[axum_typed_multipart::async_trait]
 impl TryFromChunks for Invoice {
@@ -135,6 +135,12 @@ pub struct InvoiceRow {
 pub struct InvoiceAttachment {
     pub filename: String,
     pub bytes: Vec<u8>,
+    #[serde(default = "default_pages")]
+    pub pages: usize,
+}
+
+fn default_pages() -> usize {
+    1
 }
 
 fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> {
@@ -152,6 +158,7 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
     Ok(InvoiceAttachment {
         filename,
         bytes: field.contents.to_vec(),
+        pages: 1,
     })
 }
 
@@ -173,9 +180,17 @@ pub async fn create(
 
     multipart.data.attachments = attachments
         .iter()
-        .map(|a| InvoiceAttachment {
-            filename: a.filename.clone(),
-            bytes: vec![],
+        .map(|a| {
+            let pages = if a.filename.to_lowercase().ends_with(".pdf") {
+                crate::pdfgen::count_pdf_pages(&a.bytes)
+            } else {
+                1
+            };
+            InvoiceAttachment {
+                filename: a.filename.clone(),
+                bytes: vec![],
+                pages,
+            }
         })
         .collect();
 
@@ -183,21 +198,10 @@ pub async fn create(
 
     // PDF compilation is heavily blocking
     let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
-        let (document, attached_pdfs) =
-            DocumentBuilder::new(inner_data, attachments).build_with_pdfs()?;
+        let document = DocumentBuilder::new(inner_data, attachments).build()?;
 
         let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
 
-        let mut pdfs = vec![pdf];
-        pdfs.extend_from_slice(
-            attached_pdfs
-                .into_iter()
-                .map(|a| a.bytes)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-
-        let pdf = crate::merge::merge_pdf(pdfs)?;
         Ok(pdf)
     })
     .await??;

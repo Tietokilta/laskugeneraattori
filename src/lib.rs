@@ -4,7 +4,6 @@ use std::sync::LazyLock;
 pub mod api;
 pub mod error;
 pub mod mailgun;
-pub mod merge;
 pub mod pdfgen;
 pub mod state;
 

@@ -1,17 +1,24 @@
 use crate::api::invoices::InvoiceAttachment;
 use crate::{api::invoices::Invoice, error::Error};
 use bank_barcode::{Barcode, BarcodeBuilder};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
+    Library, LibraryExt, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime, IntoValue, Value},
     layout::PagedDocument,
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, World,
 };
+
+pub fn count_pdf_pages(bytes: &[u8]) -> usize {
+    let data: hayro_syntax::PdfData = Arc::new(bytes.to_vec());
+    hayro_syntax::Pdf::new(data)
+        .map(|pdf| pdf.pages().len())
+        .unwrap_or(1)
+}
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
 
@@ -280,30 +287,17 @@ impl DocumentBuilder {
 
     #[allow(dead_code)]
     pub fn build(self) -> Result<PagedDocument, Error> {
-        self.build_with_pdfs().map(|(doc, _)| doc)
-    }
-
-    pub fn build_with_pdfs(self) -> Result<(PagedDocument, Vec<InvoiceAttachment>), Error> {
         let mut w = WORLD.clone().with_data(self.data());
 
-        let pdfs = self
-            .attachments
-            .into_iter()
-            .filter_map(|a| {
-                if a.filename.to_lowercase().ends_with(".pdf") {
-                    Some(a)
-                } else {
-                    w.files.insert(
-                        FileId::new(
-                            None,
-                            VirtualPath::new(format!("/attachments/{}", a.filename)),
-                        ),
-                        FileEntry::new(a.bytes, None),
-                    );
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        self.attachments.into_iter().for_each(|a| {
+            w.files.insert(
+                FileId::new(
+                    None,
+                    VirtualPath::new(format!("/attachments/{}", a.filename)),
+                ),
+                FileEntry::new(a.bytes, None),
+            );
+        });
 
         let typst::diag::Warned {
             output,
@@ -311,7 +305,7 @@ impl DocumentBuilder {
         } = typst::compile(&w);
 
         match output {
-            Ok(template) => Ok((template, pdfs)),
+            Ok(template) => Ok(template),
             Err(err) => Err(Error::TypstError(
                 err.into_iter()
                     .map(|e| e.message.to_string())
