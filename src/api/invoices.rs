@@ -14,6 +14,9 @@ use garde::Validate;
 use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use utoipa::ToSchema;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
@@ -26,7 +29,6 @@ impl TryFromChunks for Invoice {
         metadata: FieldMetadata,
     ) -> Result<Self, TypedMultipartError> {
         let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
-
         serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
     }
 }
@@ -75,8 +77,8 @@ pub struct Invoice {
     /// The recipient's name, maximum length of 128 characters
     #[garde(length(chars, max = 128))]
     pub recipient_name: String,
-    /// The recipient's email, maximum length of 128 characters
-    #[garde(length(chars, max = 128))]
+    /// The recipient's email, maximum length of 320 characters
+    #[garde(length(chars, max = 320))]
     pub recipient_email: String,
     /// The recipient's address
     #[garde(dive)]
@@ -90,8 +92,7 @@ pub struct Invoice {
     /// The description of the invoice, maximum length of 4096 characters
     #[garde(length(chars, max = 4096))]
     pub description: String,
-    /// The recipient's phone number, maximum length of 32 characters, must be valid and include
-    /// the counter prefix (e.g. +358)
+    /// The recipient's phone number, must be valid and include the country prefix (e.g. +358)
     #[garde(length(chars, max = 32), custom(is_valid_phone_number))]
     pub phone_number: String,
     /// A list of descriptions for the attached files, each with the maximum length of 512
@@ -156,17 +157,17 @@ fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> 
 }
 
 /// Creates an invoice with the given data and attachments and sends it by email to the treasurer
-#[utoipa::path(post, path = "/invoices", 
-    request_body(content_type = "multipart/form-data", content = InvoiceForm), 
+#[utoipa::path(post, path = "/invoices",
+    request_body(content_type = "multipart/form-data", content = InvoiceForm),
     responses(
         (status = 201, body = Invoice)
     )
 )]
-pub async fn create(
+pub async fn create_invoice(
     client: Option<MailgunClient>,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<(StatusCode, axum::Json<Invoice>), Error> {
-    use crate::pdfgen::DocumentBuilder;
+    use crate::pdfgen::InvoiceBuilder;
 
     let attachments: Vec<InvoiceAttachment> =
         Result::from_iter(multipart.attachments.into_iter().map(try_handle_file))?;
@@ -184,31 +185,18 @@ pub async fn create(
     // PDF compilation is heavily blocking
     let pdf = tokio::task::spawn_blocking(move || -> Result<_, Error> {
         let (document, attached_pdfs) =
-            DocumentBuilder::new(inner_data, attachments).build_with_pdfs()?;
+            InvoiceBuilder::new(inner_data, attachments).build_with_pdfs()?;
 
-        let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap();
+        let mut pdfs = vec![typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).unwrap()];
+        pdfs.extend(attached_pdfs.into_iter().map(|a| a.bytes));
 
-        let mut pdfs = vec![pdf];
-        pdfs.extend_from_slice(
-            attached_pdfs
-                .into_iter()
-                .map(|a| a.bytes)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-
-        let pdf = crate::merge::merge_pdf(pdfs)?;
-        Ok(pdf)
+        crate::merge::merge_pdf(pdfs)
     })
     .await??;
 
     if let Some(client) = client {
         client.send_mail(&multipart.data, pdf).await?;
     } else {
-        use tempfile::NamedTempFile;
-        use tokio::fs::File;
-        use tokio::io::AsyncWriteExt;
-
         let tmp = NamedTempFile::with_suffix(".pdf")?;
         let (file, path) = tmp.keep().unwrap();
         let mut file = File::from_std(file);

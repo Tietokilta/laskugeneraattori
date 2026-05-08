@@ -1,8 +1,10 @@
 use crate::api::invoices::InvoiceAttachment;
+use crate::api::receipts::Receipt;
 use crate::{api::invoices::Invoice, error::Error};
 use bank_barcode::{Barcode, BarcodeBuilder};
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
+use time_tz::{timezones, ToTimezone};
 use typst::{
     Library, World,
     diag::{FileError, FileResult},
@@ -14,6 +16,11 @@ use typst::{
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
+
+enum Template {
+    Invoice,
+    Receipt,
+}
 
 #[derive(Clone, Debug)]
 pub struct FontSlot {
@@ -74,7 +81,6 @@ fn fonts() -> (FontBook, Vec<FontSlot>) {
             })
         }
     }
-
     (book, fonts)
 }
 
@@ -133,7 +139,20 @@ impl Sandbox {
             FileId::new(None, VirtualPath::new("/tik.png")),
             FileEntry::new(include_bytes!("../../templates/tik.png").to_vec(), None),
         );
+        new.files.insert(
+            FileId::new(None, VirtualPath::new("/lib.typ")),
+            FileEntry::new(include_bytes!("../../templates/lib.typ").to_vec(), None),
+        );
 
+        new
+    }
+    fn with_template(&self, template: Template) -> Self {
+        let mut new = self.clone();
+        let src = match template {
+            Template::Invoice => include_str!("../../templates/invoice.typ"),
+            Template::Receipt => include_str!("../../templates/receipt.typ"),
+        };
+        new.source = Source::detached(src);
         new
     }
 
@@ -188,50 +207,41 @@ impl World for Sandbox {
         self.fonts.get(index)?.get()
     }
 
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        let offset = offset.unwrap_or(0);
-        let offset = time::UtcOffset::from_hms(offset.try_into().ok()?, 0, 0).ok()?;
-        let time = self.time.checked_to_offset(offset)?;
-        Some(Datetime::Date(time.date()))
+    fn today(&self, _offset: Option<i64>) -> Option<Datetime> {
+        let time = self.time.to_timezone(timezones::db::europe::HELSINKI);
+
+        Datetime::from_ymd_hms(
+            time.year(),
+            time.month() as u8,
+            time.day(),
+            time.hour(),
+            time.minute(),
+            time.second(),
+        )
     }
 }
 
-impl IntoValue for Invoice {
-    fn into_value(self) -> typst::foundations::Value {
-        serde_json::from_str(&serde_json::to_string(&self).unwrap()).unwrap()
-    }
+/// Serialize a value to JSON and then deserialize into a typst `Value`.
+fn to_typst_value(value: &impl serde::Serialize) -> Value {
+    let json = serde_json::to_string(value).expect("BUG: serialization failed");
+    serde_json::from_str(&json).expect("BUG: failed to deserialize into typst::Value")
 }
 
-impl TryInto<PagedDocument> for Invoice {
-    type Error = Error;
+/// Compile a `Sandbox` world into a `PagedDocument`, mapping typst diagnostics to `Error`.
+fn compile_world(w: &Sandbox) -> Result<PagedDocument, Error> {
+    let typst::diag::Warned {
+        output,
+        warnings: _,
+    } = typst::compile(w);
 
-    fn try_into(self) -> Result<PagedDocument, Error> {
-        let mut w = WORLD.clone().with_data(self.clone());
-        self.attachments.into_iter().for_each(|a| {
-            w.files.insert(
-                FileId::new(
-                    None,
-                    VirtualPath::new("/attachments/".to_owned() + &a.filename),
-                ),
-                FileEntry::new(a.bytes, None),
-            );
-        });
-
-        let typst::diag::Warned {
-            output,
-            warnings: _,
-        } = typst::compile(&w);
-
-        match output {
-            Ok(template) => Ok(template),
-            Err(err) => Err(Error::TypstError(
-                err.into_iter()
-                    .map(|e| e.message.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )),
-        }
-    }
+    output.map_err(|err| {
+        Error::TypstError(
+            err.into_iter()
+                .map(|e| e.message.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    })
 }
 
 impl TryFrom<Invoice> for Barcode {
@@ -245,12 +255,12 @@ impl TryFrom<Invoice> for Barcode {
     }
 }
 
-pub struct DocumentBuilder {
+pub struct InvoiceBuilder {
     invoice: Invoice,
     attachments: Vec<InvoiceAttachment>,
 }
 
-impl DocumentBuilder {
+impl InvoiceBuilder {
     pub fn new(invoice: Invoice, attachments: Vec<InvoiceAttachment>) -> Self {
         Self {
             invoice,
@@ -258,24 +268,18 @@ impl DocumentBuilder {
         }
     }
 
-    // FIXME: this is very ugly
     fn data(&self) -> Value {
-        let mut value: serde_json::Value = serde_json::from_str(
-            serde_json::to_string(&self.invoice)
-                .expect("BUG: serializing invoice failed")
-                .as_str(),
-        )
-        .expect("BUG: deserializing invoice failed");
+        let mut value = to_typst_value(&self.invoice);
 
-        let barcode = Barcode::try_from(self.invoice.clone());
+        // Inject the barcode field into the typst value
+        if let Value::Dict(ref mut dict) = value {
+            let barcode = Barcode::try_from(self.invoice.clone())
+                .map(|b| b.to_string())
+                .unwrap_or_default();
+            dict.insert("barcode".into(), Value::Str(barcode.into()));
+        }
 
-        value["barcode"] = barcode
-            .map(|barcode| barcode.to_string())
-            .unwrap_or_default()
-            .into();
-
-        serde_json::from_str(&value.to_string())
-            .expect("BUG: failed to deserialize into typst::Value")
+        value
     }
 
     #[allow(dead_code)]
@@ -284,7 +288,10 @@ impl DocumentBuilder {
     }
 
     pub fn build_with_pdfs(self) -> Result<(PagedDocument, Vec<InvoiceAttachment>), Error> {
-        let mut w = WORLD.clone().with_data(self.data());
+        let mut w = WORLD
+            .clone()
+            .with_template(Template::Invoice)
+            .with_data(self.data());
 
         let pdfs = self
             .attachments
@@ -305,19 +312,26 @@ impl DocumentBuilder {
             })
             .collect::<Vec<_>>();
 
-        let typst::diag::Warned {
-            output,
-            warnings: _,
-        } = typst::compile(&w);
+        let document = compile_world(&w)?;
+        Ok((document, pdfs))
+    }
+}
 
-        match output {
-            Ok(template) => Ok((template, pdfs)),
-            Err(err) => Err(Error::TypstError(
-                err.into_iter()
-                    .map(|e| e.message.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )),
-        }
+pub struct ReceiptBuilder {
+    receipt: Receipt,
+}
+
+impl ReceiptBuilder {
+    pub fn new(receipt: Receipt) -> Self {
+        Self { receipt }
+    }
+
+    pub fn build(self) -> Result<PagedDocument, Error> {
+        let w = WORLD
+            .clone()
+            .with_template(Template::Receipt)
+            .with_data(to_typst_value(&self.receipt));
+
+        compile_world(&w)
     }
 }

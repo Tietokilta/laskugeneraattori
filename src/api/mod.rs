@@ -1,3 +1,4 @@
+use axum::routing::{get, post};
 use axum::{
     Router,
     extract::DefaultBodyLimit,
@@ -7,18 +8,22 @@ use std::sync::Arc;
 use std::time::Duration;
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder, key_extractor::KeyExtractor};
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
-use utoipa::openapi::{ContactBuilder, InfoBuilder, OpenApiBuilder};
-use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa::openapi::{
+    security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    ComponentsBuilder, ContactBuilder, InfoBuilder, OpenApiBuilder,
+};
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{CONFIG, api::key_extractor::IpExtractor};
 
 pub mod invoices;
 mod key_extractor;
+pub mod receipts;
 
 pub fn app() -> Router<crate::state::State> {
     let cors_layer = CorsLayer::new().allow_origin(
-        crate::CONFIG
+        CONFIG
             .allowed_origins
             .iter()
             .map(|c| c.parse::<HeaderValue>().unwrap())
@@ -68,9 +73,21 @@ pub fn app() -> Router<crate::state::State> {
                     ))
                     .build(),
             )
+            .components(Some(
+                ComponentsBuilder::new()
+                    .security_scheme(
+                        "bearerAuth",
+                        SecurityScheme::Http(
+                            HttpBuilder::new().scheme(HttpAuthScheme::Bearer).build(),
+                        ),
+                    )
+                    .build(),
+            ))
             .build(),
     )
-    .routes(routes!(health, invoices::create))
+    .route("/health", get(health))
+    .route("/invoices", post(invoices::create_invoice))
+    .route("/receipts", post(receipts::create_receipt))
     .split_for_parts();
 
     Router::new()

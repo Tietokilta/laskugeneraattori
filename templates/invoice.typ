@@ -1,37 +1,19 @@
-#let price(number) = {
-  let num_as_str = str(number)
-  let whole_nums="0"
-  if num_as_str.len() > 2 {
-    whole_nums = num_as_str.slice(0, -2)
-  }
-  let rem = "00"
-  if num_as_str.len() == 1 {
-    rem = "0" + num_as_str
-  } else if num_as_str.len() >= 2 {
-    rem = num_as_str.slice(-2)
-  }
-  whole_nums+","+rem
-}
+#import "lib.typ": price, writeline, page_background, generator_footer
+
+#let extra_footer = [
+  Tietokilta ry *ei ole* arvonlisäverovelvollinen.
+  Ongelmatapauksissa ota yhteyttä rahastonhoitajaan:
+  #link("mailto:rahastonhoitaja@tietokilta.fi").
+  Tarkemmat yhteystiedot löydät killan sivuilta.
+]
 
 #set page(
-  background: [
-    #image("/tik.png")
-  ],
-  footer: [
-    Laskut hyväksytään Tietokillan hallituksen kokouksissa.
-    Ongelmatapauksissa ota yhteyttä rahastonhoitajaan: #link("mailto:rahastonhoitaja@tietokilta.fi").
-    Tarkemmat yhteystiedot löydät killan sivuilta.
-
-    #v(1em)
-    #align(right)[Laskugeneraattori #VERSION #link("https://github.com/Tietokilta/laskugeneraattori/commit/" + COMMIT_HASH)[#COMMIT_HASH.slice(0, 7)]]
-  ],
+  background: page_background,
+  footer: [#extra_footer #generator_footer],
   footer-descent: -0.5em,
 )
-#set text(lang: "fi")
 
-#let writeline(length) = {
-  line(length: length, start: (0pt, 1em))
-}
+#set text(lang: "fi")
 
 #move(dx: -10%, dy: -5%, box(
   width: 120%,
@@ -73,7 +55,7 @@
 
 #colbreak()
 = LASKU
-*Päivämäärä*: #datetime.today().display() \
+*Päivämäärä*: #datetime.today().display("[day padding:zero].[month padding:zero].[year]") \
 ]
 
 == Tietokilta
