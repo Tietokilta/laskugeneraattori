@@ -3,14 +3,15 @@ use crate::{api::invoices::Invoice, error::Error};
 use bank_barcode::{Barcode, BarcodeBuilder};
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
+use time::OffsetDateTime;
 use typst::{
-    Library, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime, IntoValue, Value},
     layout::PagedDocument,
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
+    Library, World,
 };
 
 static WORLD: LazyLock<Sandbox> = LazyLock::new(Sandbox::new);
@@ -238,9 +239,12 @@ impl TryFrom<Invoice> for Barcode {
     type Error = bank_barcode::BuilderError;
 
     fn try_from(invoice: Invoice) -> Result<Self, Self::Error> {
+        let sum = invoice.rows.iter().map(|row| row.unit_price as u32).sum();
         BarcodeBuilder::v4()
             .account_number(&invoice.bank_account_number)
-            .sum(invoice.rows.iter().map(|row| row.unit_price as u32).sum())
+            .sum(sum)
+            .reference(&invoice.reference_number)
+            .due_date(OffsetDateTime::now_utc().date())
             .build()
     }
 }

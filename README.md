@@ -20,7 +20,7 @@ MAILGUN_USER=
 MAILGUN_PASSWORD=
 MAILGUN_TO=
 MAILGUN_FROM=
-MAILGUN_DISABLE= # disable mailgun, e.g. for local testing
+MAILGUN_DISABLE=false # disable mailgun, e.g. for local testing
 ```
 
 ## Running laskugeneraattori

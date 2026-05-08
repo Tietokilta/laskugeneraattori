@@ -2,12 +2,34 @@ mod common;
 
 use axum::http::StatusCode;
 use common::{
-    TEST_IP, TEST_IP_HEADER, create_invoice_form, create_invoice_form_with_file,
-    create_invoice_form_with_files, create_test_server,
+    create_invoice_form, create_invoice_form_with_file, create_invoice_form_with_files,
+    create_test_server,
     fixtures::{invoice_with_attachment_descriptions, valid_invoice_json},
-    load_test_file,
+    load_test_file, TEST_IP, TEST_IP_HEADER,
 };
 use serde_json::Value;
+
+fn is_valid_finnish_reference_number(value: &str) -> bool {
+    if value.len() < 4 || value.len() > 20 || !value.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+
+    let weights = [7u32, 3, 1];
+    let (base, check_digit_str) = value.split_at(value.len() - 1);
+    let sum = base
+        .bytes()
+        .rev()
+        .enumerate()
+        .map(|(i, b)| u32::from(b - b'0') * weights[i % weights.len()])
+        .sum::<u32>();
+    let expected = ((10 - (sum % 10)) % 10) as u8;
+
+    check_digit_str
+        .chars()
+        .next()
+        .and_then(|c| c.to_digit(10))
+        .is_some_and(|d| d as u8 == expected)
+}
 
 #[tokio::test]
 async fn invoice_creation_returns_valid_json_response() {
@@ -25,6 +47,8 @@ async fn invoice_creation_returns_valid_json_response() {
     let response_json: Value = response.json();
     assert_eq!(response_json["recipient_name"], "Test User");
     assert_eq!(response_json["subject"], "Test Invoice");
+    let reference_number = response_json["reference_number"].as_str().unwrap();
+    assert!(is_valid_finnish_reference_number(reference_number));
 }
 
 #[tokio::test]

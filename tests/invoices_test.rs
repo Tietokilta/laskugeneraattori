@@ -3,17 +3,39 @@ mod common;
 use axum::http::StatusCode;
 use axum_test::multipart::{MultipartForm, Part};
 use common::{
-    TEST_IP, TEST_IP_HEADER, create_invoice_form, create_invoice_form_with_file,
-    create_invoice_form_with_files, create_test_server,
+    create_invoice_form, create_invoice_form_with_file, create_invoice_form_with_files,
+    create_test_server,
     fixtures::{
         invoice_with_attachment_descriptions, invoice_with_empty_rows, invoice_with_empty_subject,
         invoice_with_invalid_iban, invoice_with_invalid_phone, invoice_with_long_subject,
         invoice_with_multiple_rows, invoice_with_negative_price, invoice_with_zero_price,
         valid_invoice_json,
     },
-    load_test_file,
+    load_test_file, TEST_IP, TEST_IP_HEADER,
 };
 use serde_json::Value;
+
+fn is_valid_finnish_reference_number(value: &str) -> bool {
+    if value.len() < 4 || value.len() > 20 || !value.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+
+    let weights = [7u32, 3, 1];
+    let (base, check_digit_str) = value.split_at(value.len() - 1);
+    let sum = base
+        .bytes()
+        .rev()
+        .enumerate()
+        .map(|(i, b)| u32::from(b - b'0') * weights[i % weights.len()])
+        .sum::<u32>();
+    let expected = ((10 - (sum % 10)) % 10) as u8;
+
+    check_digit_str
+        .chars()
+        .next()
+        .and_then(|c| c.to_digit(10))
+        .is_some_and(|d| d as u8 == expected)
+}
 
 #[tokio::test]
 async fn create_invoice_without_attachments_succeeds() {
@@ -392,4 +414,24 @@ async fn reject_malformed_json() {
         response.status_code().is_client_error() || response.status_code().is_server_error(),
         "Expected error response for malformed JSON"
     );
+}
+
+#[tokio::test]
+async fn generated_reference_number_is_returned_and_client_value_ignored() {
+    let server = create_test_server().await;
+    let mut invoice = valid_invoice_json();
+    invoice["reference_number"] = serde_json::json!("1234");
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+    let response_json: Value = response.json();
+    let reference_number = response_json["reference_number"].as_str().unwrap();
+    assert_ne!(reference_number, "1234");
+    assert!(is_valid_finnish_reference_number(reference_number));
 }

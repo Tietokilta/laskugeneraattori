@@ -92,6 +92,8 @@
 
 *IBAN-tilinumero*: #data.bank_account_number \
 
+*Viitenumero*: #data.reference_number \
+
 *Pankkiviivakoodi*: #data.barcode \
 
 

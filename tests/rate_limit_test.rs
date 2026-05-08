@@ -3,7 +3,7 @@ mod common;
 use axum::http::StatusCode;
 use axum_test::TestServer;
 use common::{
-    TEST_IP, TEST_IP_HEADER, create_invoice_form, fixtures::valid_invoice_json, setup_test_env,
+    create_invoice_form, fixtures::valid_invoice_json, setup_test_env, TEST_IP, TEST_IP_HEADER,
 };
 use laskugeneraattori::{api::app, state};
 
