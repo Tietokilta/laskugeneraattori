@@ -19,7 +19,6 @@ use utoipa::ToSchema;
 
 static ALLOWED_FILENAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
-static REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[axum_typed_multipart::async_trait]
 impl TryFromChunks for Invoice {
@@ -93,8 +92,7 @@ fn is_valid_finnish_reference_number(value: &str) -> bool {
 
 fn generate_finnish_reference_number() -> String {
     let now = time::OffsetDateTime::now_utc().unix_timestamp_nanos();
-    let counter = REFERENCE_COUNTER.fetch_add(1, Ordering::Relaxed) as i128;
-    let seed = now.wrapping_add(counter).unsigned_abs();
+    let seed = now.unsigned_abs();
     let base = format!("{:019}", seed % 10u128.pow(19));
     let check_digit = finnish_reference_check_digit(&base).expect("BUG: invalid reference base");
     format!("{base}{check_digit}")
