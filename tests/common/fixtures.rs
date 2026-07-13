@@ -14,6 +14,7 @@ pub fn valid_invoice_json() -> Value {
         "description": "Test description for invoice",
         "phone_number": "+358401234567",
         "attachment_descriptions": [],
+        "cost_pool": "liikuntatoimikunta",
         "rows": [
             {
                 "product": "Test Product",
@@ -21,6 +22,18 @@ pub fn valid_invoice_json() -> Value {
             }
         ]
     })
+}
+
+pub fn invoice_with_unknown_cost_pool() -> Value {
+    let mut invoice = valid_invoice_json();
+    invoice["cost_pool"] = json!("ei-olemassa");
+    invoice
+}
+
+pub fn invoice_without_cost_pool() -> Value {
+    let mut invoice = valid_invoice_json();
+    invoice.as_object_mut().unwrap().remove("cost_pool");
+    invoice
 }
 
 pub fn invoice_with_invalid_iban() -> Value {

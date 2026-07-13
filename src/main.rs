@@ -1,4 +1,4 @@
-use laskugeneraattori::{CONFIG, api, state};
+use laskugeneraattori::{CONFIG, api, cost_pools::COST_POOLS, state};
 use std::net::SocketAddr;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -14,6 +14,9 @@ async fn main() {
         }))
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // Fail at startup rather than on the first invoice if the list is malformed
+    tracing::debug!("Loaded {} cost pools", COST_POOLS.len());
 
     let state = state::new().await;
     let addr = SocketAddr::from((CONFIG.bind_addr, CONFIG.port));

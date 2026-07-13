@@ -13,6 +13,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{CONFIG, api::key_extractor::IpExtractor};
 
+pub mod cost_pools;
 pub mod invoices;
 mod key_extractor;
 
@@ -70,7 +71,11 @@ pub fn app() -> Router<crate::state::State> {
             )
             .build(),
     )
-    .routes(routes!(health, invoices::create))
+    // NOTE: Every handler in a single routes!() shares one method router, so handlers on
+    // different paths have to be registered separately
+    .routes(routes!(health))
+    .routes(routes!(invoices::create))
+    .routes(routes!(cost_pools::list))
     .split_for_parts();
 
     Router::new()

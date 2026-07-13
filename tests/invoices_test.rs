@@ -8,11 +8,12 @@ use common::{
     fixtures::{
         invoice_with_attachment_descriptions, invoice_with_empty_rows, invoice_with_empty_subject,
         invoice_with_invalid_iban, invoice_with_invalid_phone, invoice_with_long_subject,
-        invoice_with_multiple_rows, invoice_with_negative_price, invoice_with_zero_price,
-        valid_invoice_json,
+        invoice_with_multiple_rows, invoice_with_negative_price, invoice_with_unknown_cost_pool,
+        invoice_with_zero_price, invoice_without_cost_pool, valid_invoice_json,
     },
     load_test_file,
 };
+use laskugeneraattori::reference;
 use serde_json::Value;
 
 #[tokio::test]
@@ -288,6 +289,91 @@ async fn reject_empty_subject() {
         ]]
     });
     assert_eq!(body, expected);
+}
+
+#[tokio::test]
+async fn reject_unknown_cost_pool() {
+    let server = create_test_server().await;
+    let invoice = invoice_with_unknown_cost_pool();
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = response.json();
+    let expected: Value = serde_json::json!({
+        "errors": [[
+            [["key", "data"], ["key", "cost_pool"]],
+            { "message": "unknown cost pool: ei-olemassa" }
+        ]]
+    });
+    assert_eq!(body, expected);
+}
+
+#[tokio::test]
+async fn generated_reference_number_encodes_the_cost_pool_account() {
+    let server = create_test_server().await;
+    let mut invoice = valid_invoice_json();
+    // A client-supplied reference number must be ignored
+    invoice["reference_number"] = serde_json::json!("1234");
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+    let body: Value = response.json();
+    let reference = body["reference_number"].as_str().unwrap();
+
+    // liikuntatoimikunta is account 4212, 1337 marks the invoice as ours
+    assert!(reference.starts_with("42121337"), "got {reference}");
+    assert_eq!(reference.len(), 20);
+    assert!(reference::is_valid(reference));
+}
+
+#[tokio::test]
+async fn missing_cost_pool_falls_back_to_the_unassigned_account() {
+    let server = create_test_server().await;
+    let invoice = invoice_without_cost_pool();
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    // A frontend that doesn't know about cost pools must still be able to create invoices
+    response.assert_status(StatusCode::CREATED);
+    let body: Value = response.json();
+    let reference = body["reference_number"].as_str().unwrap();
+
+    // 4999 does not exist in the bookkeeping, so the treasurer has to assign the invoice by hand
+    assert!(reference.starts_with("49991337"), "got {reference}");
+    assert!(reference::is_valid(reference));
+}
+
+#[tokio::test]
+async fn cost_pools_are_listed() {
+    let server = create_test_server().await;
+
+    let response = server.get("/cost-pools").await;
+
+    response.assert_status(StatusCode::OK);
+    let body: Value = response.json();
+    let pools = body.as_array().unwrap();
+    assert!(pools.iter().any(|pool| {
+        pool["id"] == "liikuntatoimikunta"
+            && pool["name"] == "Liikuntatoimikunta"
+            && pool["account"] == "4212"
+    }));
 }
 
 #[tokio::test]

@@ -2,10 +2,12 @@ use clap::Parser;
 use std::sync::LazyLock;
 
 pub mod api;
+pub mod cost_pools;
 pub mod error;
 pub mod mailgun;
 pub mod merge;
 pub mod pdfgen;
+pub mod reference;
 pub mod state;
 
 #[macro_use]
