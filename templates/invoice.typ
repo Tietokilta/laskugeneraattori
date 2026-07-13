@@ -79,6 +79,7 @@
 == Tietokilta
 
 *Aihe*: #data.subject \
+*Toimikunta*: #data.cost_pool_name \
 *Perustelut*: #data.description \
 
 === Erittely
@@ -91,6 +92,8 @@
 )
 
 *IBAN-tilinumero*: #data.bank_account_number \
+
+*Viitenumero*: #data.reference_number \
 
 *Pankkiviivakoodi*: #data.barcode \
 

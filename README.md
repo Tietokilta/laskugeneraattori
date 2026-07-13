@@ -65,7 +65,36 @@ With `invoice.json` being something like
   "subject": "Subject",
   "description": "Description",
   "bank_account_number": "FI1410093000123458",
+  "cost_pool": "liikuntatoimikunta",
   "rows": [{ "product": "Product 1", "unit_price": 100 }],
   "attachment_descriptions": ["Attachment"]
 }
 ```
+
+## Reference numbers and cost pools
+
+Every invoice is booked against a *toimikunta*, chosen by the person filing it. The
+toimikunnat and their accounting accounts live in [`cost_pools.toml`](./cost_pools.toml), and
+`GET /cost-pools` serves the list so that the frontend can populate its dropdown without
+being redeployed whenever the list changes. The `cost_pool` field of an invoice must be one
+of the `id`s from that list.
+
+The server then generates the invoice's Finnish reference number as
+
+```
+4212 1337 04713915823 4
+│    │    │           └─ check digit (7-3-1 weighting)
+│    │    └───────────── derived from the current time, makes the reference unique
+│    └────────────────── constant, marks the payment as created by laskugeneraattori
+└─────────────────────── the account of the chosen toimikunta
+```
+
+The reference travels in the bank barcode on the PDF, so when the treasurer pays the invoice
+the accounting software can route the payment to the right account on its own.
+
+`cost_pool` is optional. An invoice that arrives without one is booked against account **4999**,
+which does not exist in the bookkeeping, and is labelled *KOHDISTAMATON – toimikunta puuttuu* on
+the PDF and in the notification email. This means an older frontend keeps working instead of
+having every invoice rejected, while the treasurer still cannot pay it into the wrong place by
+accident. An *unknown* `cost_pool` id, on the other hand, is a client bug and is rejected with a
+422.

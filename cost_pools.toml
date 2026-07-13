@@ -1,0 +1,261 @@
+# Maps each toimikunta to the accounting account its payments are booked against.
+# The account becomes the first four digits of the invoice's reference number.
+#
+# `account` must be exactly 4 digits and must not start with 0: banking systems strip
+# leading zeros, which would silently corrupt the routing. Enforced at startup.
+# `id` is what the frontend sends. Renaming an id is a breaking API change; editing a
+# `name` is free and needs no frontend deploy.
+#
+# Account 4999 is reserved: invoices that arrive without a toimikunta are booked against it.
+# It intentionally does not exist in the bookkeeping, so the treasurer notices and assigns
+# them by hand. Do not add a cost pool that uses it.
+
+[[cost_pool]]
+id = "Unkown"
+name = "Unkown"
+account = "4298"
+
+[[cost_pool]]
+id = "abimarkkinointi"
+name = "Abimarkkinointi"
+account = "4201"
+
+[[cost_pool]]
+id = "alumnitoimikunta"
+name = "Alumnitoimikunta"
+account = "4202"
+
+[[cost_pool]]
+id = "digitoimikunta"
+name = "Digitoimikunta"
+account = "4203"
+
+[[cost_pool]]
+id = "sahkoiset-palvelut"
+name = "Sähköiset palvelut"
+account = "4204"
+
+[[cost_pool]]
+id = "herkkukurkkutoimikunta"
+name = "Herkkukurkkutoimikunta"
+account = "4205"
+
+[[cost_pool]]
+id = "kv-toiminta"
+name = "KV-toiminta"
+account = "4206"
+
+[[cost_pool]]
+id = "kiltahuone"
+name = "Kiltahuone"
+account = "4208"
+
+[[cost_pool]]
+id = "kulttuuritoimikunta"
+name = "Kulttuuritoimikunta"
+account = "4211"
+
+[[cost_pool]]
+id = "liikuntatoimikunta"
+name = "Liikuntatoimikunta"
+account = "4212"
+
+[[cost_pool]]
+id = "muistinnollaus"
+name = "Muistinnollaus"
+account = "4213"
+
+[[cost_pool]]
+id = "marttakerho"
+name = "Marttakerho"
+account = "4214"
+
+[[cost_pool]]
+id = "n-toimikunta"
+name = "N-toimikunta"
+account = "4215"
+
+[[cost_pool]]
+id = "opintotoimikunta"
+name = "Opintotoimikunta"
+account = "4216"
+
+[[cost_pool]]
+id = "pakettiauto"
+name = "Pakettiauto"
+account = "4218"
+
+[[cost_pool]]
+id = "pelitoimikunta"
+name = "Pelitoimikunta"
+account = "4219"
+
+[[cost_pool]]
+id = "fuksitoiminta-kevat"
+name = "Fuksitoiminta kevät"
+account = "4221"
+
+[[cost_pool]]
+id = "fuksitoiminta-syksy"
+name = "Fuksitoiminta syksy"
+account = "4222"
+
+[[cost_pool]]
+id = "fuksibileet"
+name = "Fuksibileet"
+account = "4223"
+
+[[cost_pool]]
+id = "sitsit"
+name = "Sitsit"
+account = "4227"
+
+[[cost_pool]]
+id = "ulkotoimikunta"
+name = "Ulkotoimikunta"
+account = "4230"
+
+[[cost_pool]]
+id = "yrityssuhdetoimikunta"
+name = "Yrityssuhdetoimikunta"
+account = "4231"
+
+[[cost_pool]]
+id = "isohenkilotoiminta"
+name = "ISOhenkilötoiminta"
+account = "4232"
+
+[[cost_pool]]
+id = "huomionosoitustyoryhma"
+name = "Huomionosoitustyöryhmä"
+account = "4234"
+
+[[cost_pool]]
+id = "hallinnon-kayttokulut"
+name = "Hallinnon käyttökulut"
+account = "4236"
+
+[[cost_pool]]
+id = "hallinnon-vaihtokulut"
+name = "Hallinnon vaihtokulut"
+account = "4237"
+
+[[cost_pool]]
+id = "kiltakokoukset"
+name = "Kiltakokoukset"
+account = "4240"
+
+[[cost_pool]]
+id = "edustuslahjat"
+name = "Edustuslahjat"
+account = "4241"
+
+[[cost_pool]]
+id = "vuosijuhlaedustukset"
+name = "Vuosijuhlaedustukset"
+account = "4242"
+
+[[cost_pool]]
+id = "toimihenkilotoiminta"
+name = "Toimihenkilötoiminta"
+account = "4243"
+
+[[cost_pool]]
+id = "kesakokous"
+name = "Kesäkokous"
+account = "4244"
+
+[[cost_pool]]
+id = "kilta-avustukset"
+name = "Kilta-avustukset"
+account = "4245"
+
+[[cost_pool]]
+id = "kunnianosoitukset"
+name = "Kunnianosoitukset"
+account = "4246"
+
+[[cost_pool]]
+id = "tilavuokrat"
+name = "Tilavuokrat"
+account = "4247"
+
+[[cost_pool]]
+id = "tikkujoulut"
+name = "TiKkujoulut"
+account = "4248"
+
+[[cost_pool]]
+id = "powerkahmyt"
+name = "Powerkähmyt"
+account = "4249"
+
+[[cost_pool]]
+id = "uratikas"
+name = "UraTiKAS"
+account = "4250"
+
+[[cost_pool]]
+id = "ullis"
+name = "Ullis"
+account = "4251"
+
+[[cost_pool]]
+id = "juhlavuositmk"
+name = "Juhlavuositmk"
+account = "4253"
+
+[[cost_pool]]
+id = "kahvitukset"
+name = "Kahvitukset"
+account = "4254"
+
+[[cost_pool]]
+id = "yhdenvertaisuustoimikunta"
+name = "Yhdenvertaisuustoimikunta"
+account = "4255"
+
+[[cost_pool]]
+id = "arkistotoimikunta"
+name = "Arkistotoimikunta"
+account = "4256"
+
+[[cost_pool]]
+id = "titeenitoimikunta"
+name = "Titeenitoimikunta"
+account = "4257"
+
+[[cost_pool]]
+id = "otafest"
+name = "Otafest"
+account = "4259"
+
+[[cost_pool]]
+id = "snackbar"
+name = "Snackbar"
+account = "4260"
+
+[[cost_pool]]
+id = "tanssii-tikin-kanssa"
+name = "Tanssii Tikin Kanssa"
+account = "4261"
+
+[[cost_pool]]
+id = "reliikit"
+name = "Reliikit"
+account = "4262"
+
+[[cost_pool]]
+id = "virkistaytyminen"
+name = "Virkistäytyminen"
+account = "4263"
+
+[[cost_pool]]
+id = "mentorointi"
+name = "Mentorointi"
+account = "4264"
+
+[[cost_pool]]
+id = "kansainvalisyystoiminta"
+name = "Kansainvälisyystoiminta"
+account = "4265"

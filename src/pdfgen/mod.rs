@@ -241,6 +241,10 @@ impl TryFrom<Invoice> for Barcode {
         BarcodeBuilder::v4()
             .account_number(&invoice.bank_account_number)
             .sum(invoice.rows.iter().map(|row| row.unit_price as u32).sum())
+            // The reference is what tells the accounting software which account to book the
+            // payment against, so it has to travel in the barcode the treasurer scans
+            .reference(&invoice.reference_number)
+            .due_date(time::OffsetDateTime::now_utc().date())
             .build()
     }
 }
@@ -272,6 +276,11 @@ impl DocumentBuilder {
         value["barcode"] = barcode
             .map(|barcode| barcode.to_string())
             .unwrap_or_default()
+            .into();
+
+        value["cost_pool_name"] = crate::cost_pools::resolve(self.invoice.cost_pool.as_deref())
+            .name
+            .clone()
             .into();
 
         serde_json::from_str(&value.to_string())

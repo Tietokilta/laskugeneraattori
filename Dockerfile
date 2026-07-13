@@ -15,6 +15,7 @@ RUN rm src/main.rs src/lib.rs
 # Copy the actual code files and build the application
 COPY ./src ./src
 COPY ./templates ./templates
+COPY ./cost_pools.toml ./cost_pools.toml
 # Update the file date so Cargo rebuilds it
 ARG GIT_COMMIT_SHA=development
 ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA

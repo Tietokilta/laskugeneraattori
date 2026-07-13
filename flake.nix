@@ -51,6 +51,8 @@
               (craneLib.fileset.commonCargoSources unfilteredRoot)
               (lib.fileset.maybeMissing ./templates)
               (lib.fileset.maybeMissing ./testdata)
+              # include_str!'d by src/cost_pools.rs
+              ./cost_pools.toml
             ];
           };
 
