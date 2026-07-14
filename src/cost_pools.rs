@@ -1,78 +1,99 @@
-use serde_derive::{Deserialize, Serialize};
-use std::collections::HashSet;
+use serde_derive::Deserialize;
 use std::sync::LazyLock;
-use utoipa::ToSchema;
 
-/// A toimikunta and the accounting account its invoices are booked against
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+/// A toimikunta and the accounting account its invoices are booked against, as the CMS returns
+/// it. Any other field of the document (its id, timestamps) is ignored.
+///
+/// The list is maintained in the CMS (the `cost-pools` collection), so that adding or renaming
+/// a toimikunta needs no deploy of this service.
+#[derive(Clone, Debug, Deserialize)]
 pub struct CostPool {
-    /// The identifier the client sends in the invoice
-    pub id: String,
     /// The human-readable name of the toimikunta
     pub name: String,
     /// The four-digit accounting account the payment is routed to
     pub account: String,
 }
 
-#[derive(Deserialize)]
-struct CostPoolFile {
-    cost_pool: Vec<CostPool>,
-}
-
-/// Used when the client does not tell us which toimikunta the invoice belongs to, e.g. because
-/// it is an older frontend that does not know about cost pools yet. The account deliberately
-/// does not exist in the bookkeeping, so that the payment cannot be booked by accident and the
-/// treasurer has to assign it by hand.
+/// Used when we cannot tell which toimikunta the invoice belongs to: the client did not pick
+/// one, the CMS is unreachable, or the cost pool it picked no longer exists. The account
+/// deliberately does not exist in the bookkeeping, so that the payment cannot be booked by
+/// accident and the treasurer has to assign it by hand.
+///
+/// Hardcoded on purpose: this is the fallback for the CMS being broken, so it must not depend
+/// on the CMS.
 pub static UNASSIGNED: LazyLock<CostPool> = LazyLock::new(|| CostPool {
-    id: "unassigned".into(),
     name: "KOHDISTAMATON – toimikunta puuttuu".into(),
     account: "4999".into(),
 });
 
-pub static COST_POOLS: LazyLock<Vec<CostPool>> = LazyLock::new(|| {
-    let file: CostPoolFile = toml::from_str(include_str!("../cost_pools.toml"))
-        .expect("BUG: cost_pools.toml is not valid TOML");
-
-    let mut seen = HashSet::new();
-    for pool in &file.cost_pool {
-        // A leading zero would be stripped by banking systems and shift the account
-        // digits out of the reference number
-        assert!(
-            pool.account.len() == 4
-                && pool
-                    .account
-                    .starts_with(|c: char| c.is_ascii_digit() && c != '0')
-                && pool.account.chars().all(|c| c.is_ascii_digit()),
-            "cost pool {}: account must be four digits and must not start with a zero, got {:?}",
-            pool.id,
-            pool.account
-        );
-        assert!(
-            pool.account != UNASSIGNED.account,
-            "cost pool {} uses account {}, which is reserved for unassigned invoices",
-            pool.id,
-            UNASSIGNED.account
-        );
-        assert!(
-            seen.insert(pool.id.as_str()),
-            "cost pool {} is defined twice",
-            pool.id
-        );
-    }
-
-    file.cost_pool
-});
-
-pub fn get(id: &str) -> Option<&'static CostPool> {
-    COST_POOLS.iter().find(|pool| pool.id == id)
+/// An account must be exactly four digits and must not start with a zero: banking systems strip
+/// leading zeros, which would shift every digit of the reference number and silently route the
+/// payment to the wrong account. The CMS validates this as well, this is the safety net.
+fn is_valid_account(account: &str) -> bool {
+    account.len() == 4
+        && account.starts_with(|c: char| c.is_ascii_digit() && c != '0')
+        && account.chars().all(|c| c.is_ascii_digit())
 }
 
-/// Resolves the cost pool an invoice is booked against, falling back to [`UNASSIGNED`] when the
-/// client did not pick one. An unknown id cannot reach this point, garde rejects it first.
-pub fn resolve(id: Option<&str>) -> &'static CostPool {
-    match id {
-        Some(id) => get(id).expect("BUG: cost pool validated by garde"),
-        None => &UNASSIGNED,
+/// Reads cost pools from the CMS.
+#[derive(Clone, Debug)]
+pub struct CostPoolClient {
+    client: reqwest::Client,
+    base_url: String,
+}
+
+impl CostPoolClient {
+    pub fn new(base_url: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            base_url,
+        }
+    }
+
+    async fn fetch(&self, id: &str) -> Result<CostPool, String> {
+        let url = format!("{}/api/cost-pools/{id}?depth=0", self.base_url);
+
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("request to the CMS failed: {e}"))?;
+
+        if !response.status().is_success() {
+            return Err(format!("the CMS returned {}", response.status()));
+        }
+
+        response
+            .json::<CostPool>()
+            .await
+            .map_err(|e| format!("could not parse the CMS response: {e}"))
+    }
+
+    /// Resolves the cost pool an invoice is booked against.
+    ///
+    /// Falls back to [`UNASSIGNED`] whenever the cost pool cannot be established, so that a
+    /// broken CMS never stops anyone from filing an invoice: the treasurer sees account 4999
+    /// and assigns the payment by hand.
+    pub async fn resolve(&self, id: Option<&str>) -> CostPool {
+        let Some(id) = id else {
+            return UNASSIGNED.clone();
+        };
+
+        match self.fetch(id).await {
+            Ok(pool) if is_valid_account(&pool.account) => pool,
+            Ok(pool) => {
+                warn!(
+                    "cost pool {id} has the invalid account {:?}, booking the invoice as unassigned",
+                    pool.account
+                );
+                UNASSIGNED.clone()
+            }
+            Err(e) => {
+                warn!("could not resolve cost pool {id}: {e}, booking the invoice as unassigned");
+                UNASSIGNED.clone()
+            }
+        }
     }
 }
 
@@ -81,14 +102,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cost_pool_list_is_valid() {
-        // The LazyLock asserts on every entry
-        assert!(!COST_POOLS.is_empty());
+    fn accepts_a_well_formed_account() {
+        assert!(is_valid_account("4212"));
     }
 
     #[test]
-    fn lookup_finds_a_known_pool() {
-        assert_eq!(get("liikuntatoimikunta").unwrap().account, "4212");
-        assert!(get("ei-olemassa").is_none());
+    fn rejects_accounts_that_would_corrupt_the_reference() {
+        // A leading zero is stripped by banking systems
+        assert!(!is_valid_account("0123"));
+        assert!(!is_valid_account("421"));
+        assert!(!is_valid_account("42120"));
+        assert!(!is_valid_account("4a12"));
+        assert!(!is_valid_account(""));
+    }
+
+    #[tokio::test]
+    async fn no_cost_pool_resolves_to_unassigned() {
+        let client = CostPoolClient::new("http://localhost:1".into());
+        assert_eq!(client.resolve(None).await.account, UNASSIGNED.account);
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_cms_resolves_to_unassigned() {
+        let client = CostPoolClient::new("http://localhost:1".into());
+        let pool = client.resolve(Some("507f1f77bcf86cd799439011")).await;
+        assert_eq!(pool.account, UNASSIGNED.account);
     }
 }
