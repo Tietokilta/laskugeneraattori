@@ -16,6 +16,16 @@ name = "Unkown"
 account = "4298"
 
 [[cost_pool]]
+id = "virkistaytyminen"
+name = "Virkistäytyminen"
+account = "4263"
+
+[[cost_pool]]
+id = "vuosijuhlaedustukset"
+name = "Vuosijuhlaedustukset"
+account = "4242"
+
+[[cost_pool]]
 id = "abimarkkinointi"
 name = "Abimarkkinointi"
 account = "4201"
@@ -29,11 +39,6 @@ account = "4202"
 id = "digitoimikunta"
 name = "Digitoimikunta"
 account = "4203"
-
-[[cost_pool]]
-id = "sahkoiset-palvelut"
-name = "Sähköiset palvelut"
-account = "4204"
 
 [[cost_pool]]
 id = "herkkukurkkutoimikunta"
@@ -151,19 +156,9 @@ name = "Edustuslahjat"
 account = "4241"
 
 [[cost_pool]]
-id = "vuosijuhlaedustukset"
-name = "Vuosijuhlaedustukset"
-account = "4242"
-
-[[cost_pool]]
 id = "toimihenkilotoiminta"
 name = "Toimihenkilötoiminta"
 account = "4243"
-
-[[cost_pool]]
-id = "kesakokous"
-name = "Kesäkokous"
-account = "4244"
 
 [[cost_pool]]
 id = "kilta-avustukset"
@@ -171,44 +166,9 @@ name = "Kilta-avustukset"
 account = "4245"
 
 [[cost_pool]]
-id = "kunnianosoitukset"
-name = "Kunnianosoitukset"
-account = "4246"
-
-[[cost_pool]]
-id = "tilavuokrat"
-name = "Tilavuokrat"
-account = "4247"
-
-[[cost_pool]]
 id = "tikkujoulut"
 name = "TiKkujoulut"
 account = "4248"
-
-[[cost_pool]]
-id = "powerkahmyt"
-name = "Powerkähmyt"
-account = "4249"
-
-[[cost_pool]]
-id = "uratikas"
-name = "UraTiKAS"
-account = "4250"
-
-[[cost_pool]]
-id = "ullis"
-name = "Ullis"
-account = "4251"
-
-[[cost_pool]]
-id = "juhlavuositmk"
-name = "Juhlavuositmk"
-account = "4253"
-
-[[cost_pool]]
-id = "kahvitukset"
-name = "Kahvitukset"
-account = "4254"
 
 [[cost_pool]]
 id = "yhdenvertaisuustoimikunta"
@@ -219,16 +179,6 @@ account = "4255"
 id = "arkistotoimikunta"
 name = "Arkistotoimikunta"
 account = "4256"
-
-[[cost_pool]]
-id = "titeenitoimikunta"
-name = "Titeenitoimikunta"
-account = "4257"
-
-[[cost_pool]]
-id = "otafest"
-name = "Otafest"
-account = "4259"
 
 [[cost_pool]]
 id = "snackbar"
@@ -244,11 +194,6 @@ account = "4261"
 id = "reliikit"
 name = "Reliikit"
 account = "4262"
-
-[[cost_pool]]
-id = "virkistaytyminen"
-name = "Virkistäytyminen"
-account = "4263"
 
 [[cost_pool]]
 id = "mentorointi"
