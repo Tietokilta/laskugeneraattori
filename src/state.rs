@@ -1,3 +1,4 @@
+use crate::cost_pools::CostPoolClient;
 use crate::mailgun::MailgunClient;
 
 use axum::extract::FromRef;
@@ -5,6 +6,7 @@ use axum::extract::FromRef;
 #[derive(FromRef, Clone)]
 pub struct State {
     pub mailgun_client: Option<MailgunClient>,
+    pub cost_pool_client: CostPoolClient,
     pub for_garde: (),
 }
 
@@ -18,6 +20,7 @@ pub async fn new() -> State {
             }
             res => res.ok(),
         },
+        cost_pool_client: CostPoolClient::new(crate::CONFIG.cms_url.clone()),
         for_garde: (),
     }
 }

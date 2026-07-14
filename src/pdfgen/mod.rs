@@ -278,10 +278,7 @@ impl DocumentBuilder {
             .unwrap_or_default()
             .into();
 
-        value["cost_pool_name"] = crate::cost_pools::resolve(self.invoice.cost_pool.as_deref())
-            .name
-            .clone()
-            .into();
+        value["cost_pool_name"] = self.invoice.cost_pool_name.clone().into();
 
         serde_json::from_str(&value.to_string())
             .expect("BUG: failed to deserialize into typst::Value")

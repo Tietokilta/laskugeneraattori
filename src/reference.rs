@@ -86,12 +86,15 @@ mod tests {
         assert!(is_valid(&reference));
     }
 
+    // The accounts now come from the CMS, so any four-digit account that does not start with a
+    // zero has to produce a valid reference
     #[test]
-    fn every_cost_pool_generates_a_valid_reference() {
-        for pool in crate::cost_pools::COST_POOLS.iter() {
-            let reference = generate(&pool.account);
-            assert!(is_valid(&reference), "invalid reference for {}", pool.id);
-            assert!(reference.starts_with(&pool.account));
+    fn every_possible_account_generates_a_valid_reference() {
+        for account in 1000..=9999 {
+            let account = account.to_string();
+            let reference = generate(&account);
+            assert!(is_valid(&reference), "invalid reference for {account}");
+            assert!(reference.starts_with(&account));
         }
     }
 }
