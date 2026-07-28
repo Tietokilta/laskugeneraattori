@@ -49,13 +49,13 @@ const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
 #[derive(Clone, Debug)]
 pub struct CostPoolClient {
     client: reqwest::Client,
-    base_url: String,
+    base_url: reqwest::Url,
     /// The pools seen so far, by id, each with the instant it goes stale
     cache: Arc<RwLock<HashMap<String, (CostPool, Instant)>>>,
 }
 
 impl CostPoolClient {
-    pub fn new(base_url: String) -> Self {
+    pub fn new(base_url: reqwest::Url) -> Self {
         Self {
             client: reqwest::Client::new(),
             base_url,
@@ -78,11 +78,18 @@ impl CostPoolClient {
     }
 
     async fn fetch(&self, id: &str) -> Result<CostPool, String> {
-        let url = format!("{}/api/cost-pools/{id}?depth=0", self.base_url);
+        // Appending the segments rather than formatting the URL keeps the base working with or
+        // without a trailing slash, and keeps the id out of the rest of the URL
+        let mut url = self.base_url.clone();
+        url.path_segments_mut()
+            .map_err(|()| format!("{} cannot be a base url", self.base_url))?
+            .pop_if_empty()
+            .extend(["api", "cost-pools", id]);
+        url.set_query(Some("depth=0"));
 
         let response = self
             .client
-            .get(&url)
+            .get(url)
             .send()
             .await
             .map_err(|e| format!("request to the CMS failed: {e}"))?;
@@ -158,13 +165,13 @@ mod tests {
 
     #[tokio::test]
     async fn no_cost_pool_resolves_to_unassigned() {
-        let client = CostPoolClient::new("http://localhost:1".into());
+        let client = CostPoolClient::new("http://localhost:1".parse().unwrap());
         assert_eq!(client.resolve(None).await.account, UNASSIGNED.account);
     }
 
     #[tokio::test]
     async fn an_unreachable_cms_resolves_to_unassigned() {
-        let client = CostPoolClient::new("http://localhost:1".into());
+        let client = CostPoolClient::new("http://localhost:1".parse().unwrap());
         let pool = client.resolve(Some("507f1f77bcf86cd799439011")).await;
         assert_eq!(pool.account, UNASSIGNED.account);
     }
@@ -189,7 +196,7 @@ mod tests {
             .mount(&cms)
             .await;
 
-        let client = CostPoolClient::new(cms.uri());
+        let client = CostPoolClient::new(cms.uri().parse().unwrap());
         assert_eq!(client.resolve(Some(ID)).await.account, "4212");
         assert_eq!(client.resolve(Some(ID)).await.account, "4212");
         // The clone shares the cache with the client it was cloned from
@@ -199,6 +206,20 @@ mod tests {
         );
 
         // Dropping the mock server asserts the expectation
+    }
+
+    #[tokio::test]
+    async fn a_base_url_with_a_trailing_slash_hits_the_same_path() {
+        let cms = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(format!("/api/cost-pools/{ID}")))
+            .respond_with(cost_pool_response("4212"))
+            .expect(1)
+            .mount(&cms)
+            .await;
+
+        let client = CostPoolClient::new(format!("{}/", cms.uri()).parse().unwrap());
+        assert_eq!(client.resolve(Some(ID)).await.account, "4212");
     }
 
     #[tokio::test]
@@ -217,7 +238,7 @@ mod tests {
             .mount(&cms)
             .await;
 
-        let client = CostPoolClient::new(cms.uri());
+        let client = CostPoolClient::new(cms.uri().parse().unwrap());
         assert_eq!(client.resolve(Some(ID)).await.account, UNASSIGNED.account);
         assert_eq!(client.resolve(Some(ID)).await.account, "4212");
     }
@@ -238,7 +259,7 @@ mod tests {
             .mount(&cms)
             .await;
 
-        let client = CostPoolClient::new(cms.uri());
+        let client = CostPoolClient::new(cms.uri().parse().unwrap());
         assert_eq!(client.resolve(Some(ID)).await.account, UNASSIGNED.account);
         assert_eq!(client.resolve(Some(ID)).await.account, "4212");
     }
@@ -253,7 +274,7 @@ mod tests {
             .mount(&cms)
             .await;
 
-        let client = CostPoolClient::new(cms.uri());
+        let client = CostPoolClient::new(cms.uri().parse().unwrap());
         client.resolve(Some(ID)).await;
 
         // Expire the entry instead of waiting an hour for it to go stale on its own

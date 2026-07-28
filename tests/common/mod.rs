@@ -66,7 +66,7 @@ pub async fn create_test_server() -> TestServer {
 pub async fn create_test_server_with_cms(cms_url: String) -> TestServer {
     setup_test_env();
     let mut state = state::new().await;
-    state.cost_pool_client = CostPoolClient::new(cms_url);
+    state.cost_pool_client = CostPoolClient::new(cms_url.parse().expect("a valid CMS url"));
     let app = app().with_state(state);
     TestServer::new(app).unwrap()
 }
