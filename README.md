@@ -15,7 +15,7 @@ The following variables can be configured in the environment (or the .env file)
 PORT=3000
 BIND_ADDR=127.0.0.1
 ALLOWED_ORIGINS= # comma separated list of urls
-CMS_URL= # required, base url of the CMS the cost pools are read from, e.g. https://tietokilta.fi
+CMS_URL="https://tietokilta.fi" # base url of the CMS the cost pools are read from
 MAILGUN_URL=
 MAILGUN_USER=
 MAILGUN_PASSWORD=

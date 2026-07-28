@@ -58,11 +58,10 @@ pub struct MailgunConfig {
 pub struct LaskugenConfig {
     #[clap(flatten)]
     pub mailgun: MailgunConfig,
-    /// Base URL of the CMS the cost pools are read from, e.g. https://tietokilta.fi.
-    /// Rejected when empty: booting with no CMS would book every invoice against the unassigned
-    /// account without anyone noticing.
-    #[clap(long, env, value_parser = clap::builder::NonEmptyStringValueParser::new())]
-    pub cms_url: String,
+    /// Base URL of the CMS the cost pools are read from. Only ever points elsewhere in
+    /// development and in the tests, so the production CMS is the default.
+    #[clap(long, env, default_value = "https://tietokilta.fi")]
+    pub cms_url: reqwest::Url,
     #[clap(long, env, required = false, default_value = "3000")]
     pub port: u16,
     #[clap(long, env, required = false, default_value = "127.0.0.1")]

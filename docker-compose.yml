@@ -9,8 +9,6 @@ services:
       - PORT=3000
       - BIND_ADDR=0.0.0.0
       - ALLOWED_ORIGINS=
-      # Required. The service refuses to start without it, because a missing CMS would silently
-      # book every invoice against the unassigned account.
       - CMS_URL=https://tietokilta.fi
       - MAILGUN_URL=
       - MAILGUN_USER=
