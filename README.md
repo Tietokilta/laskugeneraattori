@@ -94,8 +94,11 @@ The reference travels in the bank barcode on the PDF, so when the treasurer pays
 the accounting software can route the payment to the right account on its own.
 
 `cost_pool` is optional. An invoice whose toimikunta cannot be established — none was sent, the
-CMS does not know the id, or the CMS is unreachable — is booked against account **4999**, which
-does not exist in the bookkeeping, and is labelled *KOHDISTAMATON – toimikunta puuttuu* on the
-PDF and in the notification email. Nothing about the CMS can stop someone from filing an
-invoice; the treasurer just has to assign those by hand. A `cost_pool` that is not a CMS
-document id at all is a client bug and is rejected with a 422.
+CMS is unreachable, or the account it has for the toimikunta is unusable — is booked against
+account **4999**, which does not exist in the bookkeeping, and is labelled *KOHDISTAMATON* on
+the PDF and in the notification email. Our own trouble with the CMS never stops someone from
+filing an invoice; the treasurer just has to assign those by hand.
+
+A `cost_pool` the CMS does not know is a different matter and is rejected with a 400: the client
+picked it out of a list served by the same CMS, so the list is stale and reloading it fixes the
+problem. One that is not a CMS document id at all is rejected with a 422.

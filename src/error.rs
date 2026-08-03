@@ -18,6 +18,10 @@ pub enum Error {
     MissingFilename,
     #[error("Unsupported file format: {0}. Supported file formats are (jpg|jpeg|png|gif|svg|pdf)")]
     UnsupportedFileFormat(String),
+    /// The id is well-formed but the CMS has no such cost pool, so the list the client picked
+    /// from is stale
+    #[error("Unknown cost pool: {0}")]
+    UnknownCostPool(String),
     #[error("Error in handling json value")]
     JsonRejection(#[from] axum::extract::rejection::JsonRejection),
     #[error("Error while parsing json")]
@@ -49,6 +53,7 @@ impl IntoResponse for Error {
             | Error::MultipartError(_)
             | Error::MultipartRejection(_)
             | Error::JsonRejection(_)
+            | Error::UnknownCostPool(_)
             | Error::UnsupportedFileFormat(_) => StatusCode::BAD_REQUEST,
         };
 
