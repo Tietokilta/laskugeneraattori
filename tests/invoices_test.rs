@@ -367,7 +367,7 @@ async fn missing_cost_pool_falls_back_to_the_unassigned_account() {
 }
 
 #[tokio::test]
-async fn cost_pool_the_cms_does_not_know_falls_back_to_the_unassigned_account() {
+async fn cost_pool_the_cms_does_not_know_is_rejected() {
     let cms = mock_cms().await;
     let server = create_test_server_with_cms(cms.uri()).await;
     // The pool was deleted in the CMS while the form was open
@@ -380,13 +380,8 @@ async fn cost_pool_the_cms_does_not_know_falls_back_to_the_unassigned_account() 
         .multipart(form)
         .await;
 
-    // Losing the cost pool must not lose the invoice
-    response.assert_status(StatusCode::CREATED);
-    let body: Value = response.json();
-    let reference = body["reference_number"].as_str().unwrap();
-
-    assert!(reference.starts_with("49991337"), "got {reference}");
-    assert!(reference::is_valid(reference));
+    // The client picked from a list that is now stale, and can fix that by reloading it
+    response.assert_status(StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

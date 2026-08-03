@@ -1,3 +1,4 @@
+use crate::error::Error;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
@@ -16,10 +17,9 @@ pub struct CostPool {
     pub account: String,
 }
 
-/// Used when we cannot tell which toimikunta the invoice belongs to: the client did not pick
-/// one, the CMS is unreachable, or the cost pool it picked no longer exists. The account
-/// deliberately does not exist in the bookkeeping, so that the payment cannot be booked by
-/// accident and the treasurer has to assign it by hand.
+/// Used when we cannot tell which toimikunta the invoice belongs to: the client did not pick one
+/// or the CMS is unreachable. The account deliberately does not exist in the bookkeeping, so that
+/// the payment cannot be booked by accident and the treasurer has to assign it by hand.
 ///
 /// Hardcoded on purpose: this is the fallback for the CMS being broken, so it must not depend
 /// on the CMS.
@@ -27,6 +27,18 @@ pub static UNASSIGNED: LazyLock<CostPool> = LazyLock::new(|| CostPool {
     name: "KOHDISTAMATON – toimikunta puuttuu".into(),
     account: "4999".into(),
 });
+
+/// The same fallback for a toimikunta we know the name of but cannot book against. Naming it
+/// tells the treasurer which CMS document to have fixed.
+fn unassigned_but_named(pool: &CostPool) -> CostPool {
+    CostPool {
+        name: format!(
+            "KOHDISTAMATON – {} (virheellinen tili {})",
+            pool.name, pool.account
+        ),
+        account: UNASSIGNED.account.clone(),
+    }
+}
 
 /// An account must be exactly four digits and must not start with a zero: banking systems strip
 /// leading zeros, which would shift every digit of the reference number and silently route the
@@ -42,6 +54,14 @@ fn is_valid_account(account: &str) -> bool {
 /// keeping them for an hour takes the CMS round trip off the invoice request in practice, while
 /// an edit in the CMS still reaches us without a restart.
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
+
+/// A pool the CMS does not have is the client's problem and is reported back to it, anything
+/// else is ours and must not cost anyone their invoice.
+#[derive(Debug)]
+enum FetchError {
+    NotFound,
+    Unavailable(String),
+}
 
 /// Reads cost pools from the CMS, keeping the ones it has seen in memory.
 ///
@@ -77,12 +97,14 @@ impl CostPoolClient {
             .insert(id.to_string(), (pool.clone(), Instant::now() + CACHE_TTL));
     }
 
-    async fn fetch(&self, id: &str) -> Result<CostPool, String> {
+    async fn fetch(&self, id: &str) -> Result<CostPool, FetchError> {
         // Appending the segments rather than formatting the URL keeps the base working with or
         // without a trailing slash, and keeps the id out of the rest of the URL
         let mut url = self.base_url.clone();
         url.path_segments_mut()
-            .map_err(|()| format!("{} cannot be a base url", self.base_url))?
+            .map_err(|()| {
+                FetchError::Unavailable(format!("{} cannot be a base url", self.base_url))
+            })?
             .pop_if_empty()
             .extend(["api", "cost-pools", id]);
         url.set_query(Some("depth=0"));
@@ -92,51 +114,58 @@ impl CostPoolClient {
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("request to the CMS failed: {e}"))?;
+            .map_err(|e| FetchError::Unavailable(format!("request to the CMS failed: {e}")))?;
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(FetchError::NotFound);
+        }
 
         if !response.status().is_success() {
-            return Err(format!("the CMS returned {}", response.status()));
+            return Err(FetchError::Unavailable(format!(
+                "the CMS returned {}",
+                response.status()
+            )));
         }
 
         response
             .json::<CostPool>()
             .await
-            .map_err(|e| format!("could not parse the CMS response: {e}"))
+            .map_err(|e| FetchError::Unavailable(format!("could not parse the CMS response: {e}")))
     }
 
-    /// Resolves the cost pool an invoice is booked against.
+    /// Resolves the cost pool an invoice is booked against. Only an id the CMS does not know is
+    /// an error: our own trouble with the CMS falls back to [`UNASSIGNED`] rather than costing
+    /// someone their invoice, and the treasurer assigns those by hand.
     ///
-    /// Falls back to [`UNASSIGNED`] whenever the cost pool cannot be established, so that a
-    /// broken CMS never stops anyone from filing an invoice: the treasurer sees account 4999
-    /// and assigns the payment by hand.
-    ///
-    /// The CMS is only asked about pools that are not in the cache. Nothing that resolved to
-    /// [`UNASSIGNED`] is cached, so an outage or a bad account in the CMS is retried – and
-    /// recovers – on the very next invoice.
-    pub async fn resolve(&self, id: Option<&str>) -> CostPool {
+    /// Only a cache miss reaches the CMS. Nothing that fell back is cached, so the next invoice
+    /// retries.
+    pub async fn resolve(&self, id: Option<&str>) -> Result<CostPool, Error> {
         let Some(id) = id else {
-            return UNASSIGNED.clone();
+            return Ok(UNASSIGNED.clone());
         };
 
         if let Some(pool) = self.cached(id) {
-            return pool;
+            return Ok(pool);
         }
 
         match self.fetch(id).await {
             Ok(pool) if is_valid_account(&pool.account) => {
                 self.cache(id, &pool);
-                pool
+                Ok(pool)
             }
+            // The CMS validates the account too, so this is a should-never-happen. Loud, but not
+            // the filer's fault and not something they could fix by trying again.
             Ok(pool) => {
-                warn!(
-                    "cost pool {id} has the invalid account {:?}, booking the invoice as unassigned",
-                    pool.account
+                error!(
+                    "cost pool {id} ({}) has the invalid account {:?}, booking the invoice as unassigned",
+                    pool.name, pool.account
                 );
-                UNASSIGNED.clone()
+                Ok(unassigned_but_named(&pool))
             }
-            Err(e) => {
+            Err(FetchError::NotFound) => Err(Error::UnknownCostPool(id.to_string())),
+            Err(FetchError::Unavailable(e)) => {
                 warn!("could not resolve cost pool {id}: {e}, booking the invoice as unassigned");
-                UNASSIGNED.clone()
+                Ok(UNASSIGNED.clone())
             }
         }
     }
@@ -166,13 +195,19 @@ mod tests {
     #[tokio::test]
     async fn no_cost_pool_resolves_to_unassigned() {
         let client = CostPoolClient::new("http://localhost:1".parse().unwrap());
-        assert_eq!(client.resolve(None).await.account, UNASSIGNED.account);
+        assert_eq!(
+            client.resolve(None).await.unwrap().account,
+            UNASSIGNED.account
+        );
     }
 
     #[tokio::test]
     async fn an_unreachable_cms_resolves_to_unassigned() {
         let client = CostPoolClient::new("http://localhost:1".parse().unwrap());
-        let pool = client.resolve(Some("507f1f77bcf86cd799439011")).await;
+        let pool = client
+            .resolve(Some("507f1f77bcf86cd799439011"))
+            .await
+            .unwrap();
         assert_eq!(pool.account, UNASSIGNED.account);
     }
 
@@ -197,11 +232,11 @@ mod tests {
             .await;
 
         let client = CostPoolClient::new(cms.uri().parse().unwrap());
-        assert_eq!(client.resolve(Some(ID)).await.account, "4212");
-        assert_eq!(client.resolve(Some(ID)).await.account, "4212");
+        assert_eq!(client.resolve(Some(ID)).await.unwrap().account, "4212");
+        assert_eq!(client.resolve(Some(ID)).await.unwrap().account, "4212");
         // The clone shares the cache with the client it was cloned from
         assert_eq!(
-            client.clone().resolve(Some(ID)).await.name,
+            client.clone().resolve(Some(ID)).await.unwrap().name,
             "Liikuntatoimikunta"
         );
 
@@ -219,7 +254,7 @@ mod tests {
             .await;
 
         let client = CostPoolClient::new(format!("{}/", cms.uri()).parse().unwrap());
-        assert_eq!(client.resolve(Some(ID)).await.account, "4212");
+        assert_eq!(client.resolve(Some(ID)).await.unwrap().account, "4212");
     }
 
     #[tokio::test]
@@ -239,8 +274,11 @@ mod tests {
             .await;
 
         let client = CostPoolClient::new(cms.uri().parse().unwrap());
-        assert_eq!(client.resolve(Some(ID)).await.account, UNASSIGNED.account);
-        assert_eq!(client.resolve(Some(ID)).await.account, "4212");
+        assert_eq!(
+            client.resolve(Some(ID)).await.unwrap().account,
+            UNASSIGNED.account
+        );
+        assert_eq!(client.resolve(Some(ID)).await.unwrap().account, "4212");
     }
 
     #[tokio::test]
@@ -260,8 +298,31 @@ mod tests {
             .await;
 
         let client = CostPoolClient::new(cms.uri().parse().unwrap());
-        assert_eq!(client.resolve(Some(ID)).await.account, UNASSIGNED.account);
-        assert_eq!(client.resolve(Some(ID)).await.account, "4212");
+        let pool = client.resolve(Some(ID)).await.unwrap();
+        assert_eq!(pool.account, UNASSIGNED.account);
+        // The treasurer's email says which toimikunta it was and what was wrong with it
+        assert_eq!(
+            pool.name,
+            "KOHDISTAMATON – Liikuntatoimikunta (virheellinen tili 0212)"
+        );
+
+        assert_eq!(client.resolve(Some(ID)).await.unwrap().account, "4212");
+    }
+
+    #[tokio::test]
+    async fn a_cost_pool_the_cms_does_not_know_is_rejected() {
+        let cms = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(format!("/api/cost-pools/{ID}")))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&cms)
+            .await;
+
+        let client = CostPoolClient::new(cms.uri().parse().unwrap());
+        assert!(matches!(
+            client.resolve(Some(ID)).await,
+            Err(Error::UnknownCostPool(_))
+        ));
     }
 
     #[tokio::test]
@@ -275,11 +336,11 @@ mod tests {
             .await;
 
         let client = CostPoolClient::new(cms.uri().parse().unwrap());
-        client.resolve(Some(ID)).await;
+        client.resolve(Some(ID)).await.unwrap();
 
         // Expire the entry instead of waiting an hour for it to go stale on its own
         client.cache.write().unwrap().get_mut(ID).unwrap().1 = Instant::now();
 
-        client.resolve(Some(ID)).await;
+        client.resolve(Some(ID)).await.unwrap();
     }
 }

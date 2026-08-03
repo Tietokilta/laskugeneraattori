@@ -57,10 +57,9 @@ fn is_valid_phone_number(value: &str, _: &()) -> garde::Result {
     }
 }
 
-// The id is interpolated into the URL we request from the CMS, so only accept what a CMS
-// document id can actually look like. Whether the pool exists is decided by the CMS: an id that
-// is well-formed but unknown falls back to the unassigned account rather than failing the
-// invoice. A missing cost pool is allowed and does the same.
+// Only accept what a CMS document id can look like; whether the pool exists is decided by the
+// CMS, which rejects a well-formed but unknown id. A missing cost pool is allowed and is booked
+// against the unassigned account.
 fn is_valid_cost_pool_id(value: &Option<String>, _: &()) -> garde::Result {
     match value {
         None => Ok(()),
@@ -215,7 +214,7 @@ pub async fn create(
 
     let cost_pool = cost_pools
         .resolve(multipart.data.cost_pool.as_deref())
-        .await;
+        .await?;
     multipart.data.reference_number = reference::generate(&cost_pool.account);
     multipart.data.cost_pool_name = cost_pool.name;
 
