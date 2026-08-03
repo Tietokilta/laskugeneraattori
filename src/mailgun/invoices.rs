@@ -6,17 +6,25 @@ use chrono::{self, Local};
 impl MailgunClient {
     pub async fn send_mail(self, invoice: &Invoice, pdf: Vec<u8>) -> Result<(), Error> {
         let invoice_recipient = format!("{} <{}>", invoice.recipient_name, invoice.recipient_email);
+        let cost_pool_name = &invoice.cost_pool_name;
+
         let form = reqwest::multipart::Form::new()
             .text("from", self.from)
             .text("to", self.default_to)
             .text("cc", invoice_recipient)
             .text(
                 "subject",
-                format!("Uusi lasku, lähettäjä {}", invoice.recipient_name),
+                format!(
+                    "Uusi lasku ({}), lähettäjä {}",
+                    cost_pool_name, invoice.recipient_name
+                ),
             )
             .text(
                 "html",
-                format!("Uusi lasku, lähettäjä {}", invoice.recipient_name),
+                format!(
+                    "Uusi lasku, lähettäjä {}<br>Toimikunta: {}<br>Viitenumero: {}",
+                    invoice.recipient_name, cost_pool_name, invoice.reference_number
+                ),
             )
             .part(
                 "attachment",

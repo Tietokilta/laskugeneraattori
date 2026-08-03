@@ -9,6 +9,7 @@ services:
       - PORT=3000
       - BIND_ADDR=0.0.0.0
       - ALLOWED_ORIGINS=
+      - CMS_URL=https://tietokilta.fi
       - MAILGUN_URL=
       - MAILGUN_USER=
       - MAILGUN_PASSWORD=

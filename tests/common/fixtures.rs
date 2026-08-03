@@ -1,3 +1,4 @@
+use super::TEST_COST_POOL_ID;
 use serde_json::{Value, json};
 
 pub fn valid_invoice_json() -> Value {
@@ -14,6 +15,7 @@ pub fn valid_invoice_json() -> Value {
         "description": "Test description for invoice",
         "phone_number": "+358401234567",
         "attachment_descriptions": [],
+        "cost_pool": TEST_COST_POOL_ID,
         "rows": [
             {
                 "product": "Test Product",
@@ -21,6 +23,26 @@ pub fn valid_invoice_json() -> Value {
             }
         ]
     })
+}
+
+/// A well-formed id the CMS has never heard of, e.g. a cost pool deleted while the form was open
+pub fn invoice_with_unknown_cost_pool() -> Value {
+    let mut invoice = valid_invoice_json();
+    invoice["cost_pool"] = json!("507f1f77bcf86cd799439099");
+    invoice
+}
+
+/// Not a CMS document id at all, so it never reaches the CMS
+pub fn invoice_with_malformed_cost_pool_id() -> Value {
+    let mut invoice = valid_invoice_json();
+    invoice["cost_pool"] = json!("ei-olemassa");
+    invoice
+}
+
+pub fn invoice_without_cost_pool() -> Value {
+    let mut invoice = valid_invoice_json();
+    invoice.as_object_mut().unwrap().remove("cost_pool");
+    invoice
 }
 
 pub fn invoice_with_invalid_iban() -> Value {

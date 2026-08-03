@@ -2,10 +2,12 @@ use clap::Parser;
 use std::sync::LazyLock;
 
 pub mod api;
+pub mod cost_pools;
 pub mod error;
 pub mod mailgun;
 pub mod merge;
 pub mod pdfgen;
+pub mod reference;
 pub mod state;
 
 #[macro_use]
@@ -56,6 +58,10 @@ pub struct MailgunConfig {
 pub struct LaskugenConfig {
     #[clap(flatten)]
     pub mailgun: MailgunConfig,
+    /// Base URL of the CMS the cost pools are read from. Only ever points elsewhere in
+    /// development and in the tests, so the production CMS is the default.
+    #[clap(long, env, default_value = "https://tietokilta.fi")]
+    pub cms_url: reqwest::Url,
     #[clap(long, env, required = false, default_value = "3000")]
     pub port: u16,
     #[clap(long, env, required = false, default_value = "127.0.0.1")]

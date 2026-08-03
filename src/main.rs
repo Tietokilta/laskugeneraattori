@@ -15,6 +15,8 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    tracing::debug!("Reading cost pools from {}", CONFIG.cms_url);
+
     let state = state::new().await;
     let addr = SocketAddr::from((CONFIG.bind_addr, CONFIG.port));
     tracing::debug!("Listening on {addr}");

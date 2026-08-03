@@ -3,16 +3,19 @@ mod common;
 use axum::http::StatusCode;
 use axum_test::multipart::{MultipartForm, Part};
 use common::{
-    TEST_IP, TEST_IP_HEADER, create_invoice_form, create_invoice_form_with_file,
-    create_invoice_form_with_files, create_test_server,
+    TEST_COST_POOL_NAME, TEST_IP, TEST_IP_HEADER, create_invoice_form,
+    create_invoice_form_with_file, create_invoice_form_with_files, create_test_server,
+    create_test_server_with_cms,
     fixtures::{
         invoice_with_attachment_descriptions, invoice_with_empty_rows, invoice_with_empty_subject,
         invoice_with_invalid_iban, invoice_with_invalid_phone, invoice_with_long_subject,
-        invoice_with_multiple_rows, invoice_with_negative_price, invoice_with_zero_price,
-        valid_invoice_json,
+        invoice_with_malformed_cost_pool_id, invoice_with_multiple_rows,
+        invoice_with_negative_price, invoice_with_unknown_cost_pool, invoice_with_zero_price,
+        invoice_without_cost_pool, valid_invoice_json,
     },
-    load_test_file,
+    load_test_file, mock_cms,
 };
+use laskugeneraattori::reference;
 use serde_json::Value;
 
 #[tokio::test]
@@ -288,6 +291,119 @@ async fn reject_empty_subject() {
         ]]
     });
     assert_eq!(body, expected);
+}
+
+#[tokio::test]
+async fn reject_malformed_cost_pool_id() {
+    let server = create_test_server().await;
+    let invoice = invoice_with_malformed_cost_pool_id();
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = response.json();
+    let expected: Value = serde_json::json!({
+        "errors": [[
+            [["key", "data"], ["key", "cost_pool"]],
+            { "message": "not a cost pool id: ei-olemassa" }
+        ]]
+    });
+    assert_eq!(body, expected);
+}
+
+#[tokio::test]
+async fn generated_reference_number_encodes_the_cost_pool_account() {
+    let cms = mock_cms().await;
+    let server = create_test_server_with_cms(cms.uri()).await;
+    let mut invoice = valid_invoice_json();
+    // A client-supplied reference number must be ignored
+    invoice["reference_number"] = serde_json::json!("1234");
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+    let body: Value = response.json();
+    let reference = body["reference_number"].as_str().unwrap();
+
+    // The cost pool in the CMS is account 4212, 1337 marks the invoice as ours
+    assert!(reference.starts_with("42121337"), "got {reference}");
+    assert_eq!(reference.len(), 20);
+    assert!(reference::is_valid(reference));
+    // The name comes from the CMS and ends up on the PDF and in the treasurer's email
+    assert_eq!(body["cost_pool_name"], TEST_COST_POOL_NAME);
+}
+
+#[tokio::test]
+async fn missing_cost_pool_falls_back_to_the_unassigned_account() {
+    let cms = mock_cms().await;
+    let server = create_test_server_with_cms(cms.uri()).await;
+    let invoice = invoice_without_cost_pool();
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    // A frontend that doesn't know about cost pools must still be able to create invoices
+    response.assert_status(StatusCode::CREATED);
+    let body: Value = response.json();
+    let reference = body["reference_number"].as_str().unwrap();
+
+    // 4999 does not exist in the bookkeeping, so the treasurer has to assign the invoice by hand
+    assert!(reference.starts_with("49991337"), "got {reference}");
+    assert!(reference::is_valid(reference));
+}
+
+#[tokio::test]
+async fn cost_pool_the_cms_does_not_know_is_rejected() {
+    let cms = mock_cms().await;
+    let server = create_test_server_with_cms(cms.uri()).await;
+    // The pool was deleted in the CMS while the form was open
+    let invoice = invoice_with_unknown_cost_pool();
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    // The client picked from a list that is now stale, and can fix that by reloading it
+    response.assert_status(StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn an_unreachable_cms_falls_back_to_the_unassigned_account() {
+    // create_test_server points at a CMS that is not listening
+    let server = create_test_server().await;
+    let invoice = valid_invoice_json();
+    let form = create_invoice_form(&invoice);
+
+    let response = server
+        .post("/invoices")
+        .add_header(TEST_IP_HEADER, TEST_IP)
+        .multipart(form)
+        .await;
+
+    // A CMS outage must not stop anyone from invoicing
+    response.assert_status(StatusCode::CREATED);
+    let body: Value = response.json();
+    let reference = body["reference_number"].as_str().unwrap();
+
+    assert!(reference.starts_with("49991337"), "got {reference}");
+    assert!(reference::is_valid(reference));
 }
 
 #[tokio::test]

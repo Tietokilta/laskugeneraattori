@@ -15,6 +15,7 @@ The following variables can be configured in the environment (or the .env file)
 PORT=3000
 BIND_ADDR=127.0.0.1
 ALLOWED_ORIGINS= # comma separated list of urls
+CMS_URL="https://tietokilta.fi" # base url of the CMS the cost pools are read from
 MAILGUN_URL=
 MAILGUN_USER=
 MAILGUN_PASSWORD=
@@ -65,7 +66,39 @@ With `invoice.json` being something like
   "subject": "Subject",
   "description": "Description",
   "bank_account_number": "FI1410093000123458",
+  "cost_pool": "507f1f77bcf86cd799439011",
   "rows": [{ "product": "Product 1", "unit_price": 100 }],
   "attachment_descriptions": ["Attachment"]
 }
 ```
+
+## Reference numbers and cost pools
+
+Every invoice is booked against a *toimikunta*, chosen by the person filing it. The toimikunnat
+and their accounting accounts are maintained in the CMS, in the `cost-pools` collection, so that
+adding or renaming one needs no deploy of either the site or this service. The `cost_pool` field
+of an invoice is the id of such a document, and this service looks it up from
+`$CMS_URL/api/cost-pools/{id}` to find the account.
+
+The server then generates the invoice's Finnish reference number as
+
+```
+4212 1337 04713915823 4
+│    │    │           └─ check digit (7-3-1 weighting)
+│    │    └───────────── derived from the current time, makes the reference unique
+│    └────────────────── constant, marks the payment as created by laskugeneraattori
+└─────────────────────── the account of the chosen toimikunta
+```
+
+The reference travels in the bank barcode on the PDF, so when the treasurer pays the invoice
+the accounting software can route the payment to the right account on its own.
+
+`cost_pool` is optional. An invoice whose toimikunta cannot be established — none was sent, the
+CMS is unreachable, or the account it has for the toimikunta is unusable — is booked against
+account **4999**, which does not exist in the bookkeeping, and is labelled *KOHDISTAMATON* on
+the PDF and in the notification email. Our own trouble with the CMS never stops someone from
+filing an invoice; the treasurer just has to assign those by hand.
+
+A `cost_pool` the CMS does not know is a different matter and is rejected with a 400: the client
+picked it out of a list served by the same CMS, so the list is stale and reloading it fixes the
+problem. One that is not a CMS document id at all is rejected with a 422.

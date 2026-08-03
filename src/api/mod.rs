@@ -70,7 +70,10 @@ pub fn app() -> Router<crate::state::State> {
             )
             .build(),
     )
-    .routes(routes!(health, invoices::create))
+    // NOTE: Every handler in a single routes!() shares one method router, so handlers on
+    // different paths have to be registered separately
+    .routes(routes!(health))
+    .routes(routes!(invoices::create))
     .split_for_parts();
 
     Router::new()

@@ -41,6 +41,7 @@ lopdf = { version = "0.38.0" }
 phonenumber = "0.3.7"
 regex = "1.12.2"
 reqwest = { version = "0.12.24", default-features = false, features = [
+  "json",
   "multipart",
   "rustls-tls",
 ] }
@@ -66,3 +67,4 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }
 
 [dev-dependencies]
 axum-test = "18.1.0"
+wiremock = "0.6.5"
