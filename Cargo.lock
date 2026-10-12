@@ -390,9 +390,9 @@ checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
 name = "bank-barcode"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7631d49bc990b1f0606f5c533ae6c1d403556908a221992837dd4c7aa2fea858"
+checksum = "530e3f0d33605d26efd08ed67c70e6503ed4f7d6b38d51bbcae18d2ac540fee8"
 dependencies = [
  "either",
  "iban",
@@ -1060,9 +1060,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.13.0"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
+checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
 
 [[package]]
 name = "email_address"
@@ -1756,9 +1756,9 @@ dependencies = [
 
 [[package]]
 name = "iban"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cce830c00f4db2a267ecadf0f02f3359d0104f9f48e7b128bae881c0b59f37c2"
+checksum = "adab60b810e693e7606965f34d0ebb62ea5917cccc5ee7c82ad7f0b287d6fe8a"
 dependencies = [
  "arrayvec",
  "csv",
@@ -1767,6 +1767,7 @@ dependencies = [
  "quote",
  "regex",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]

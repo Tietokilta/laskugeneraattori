@@ -1,6 +1,6 @@
 use crate::api::invoices::InvoiceAttachment;
 use crate::{api::invoices::Invoice, error::Error};
-use bank_barcode::{Barcode, BarcodeBuilder};
+use bank_barcode::Barcode;
 use std::sync::LazyLock;
 use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use typst::{
@@ -238,7 +238,7 @@ impl TryFrom<Invoice> for Barcode {
     type Error = bank_barcode::BuilderError;
 
     fn try_from(invoice: Invoice) -> Result<Self, Self::Error> {
-        BarcodeBuilder::v4()
+        Barcode::builder()
             .account_number(&invoice.bank_account_number)
             .sum(invoice.rows.iter().map(|row| row.unit_price as u32).sum())
             // The reference is what tells the accounting software which account to book the

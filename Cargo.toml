@@ -29,7 +29,7 @@ axum-valid = { version = "0.24.0", features = [
   "typed_multipart",
 ], default-features = false }
 axum_typed_multipart = "0.16.4"
-bank-barcode = "0.1.0"
+bank-barcode = "0.2.1"
 chrono = "0.4.42"
 clap = { version = "4.5.50", features = ["env", "derive"] }
 dotenv = "0.15.0"
