@@ -60,7 +60,7 @@ pub fn generate(account: &str) -> String {
     );
     let check = check_digit(&base).expect("BUG: generated an invalid reference number base");
 
-    format!("RF{base}{check}")
+    format!("{base}{check}")
 }
 
 #[cfg(test)]
