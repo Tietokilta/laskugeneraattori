@@ -61,12 +61,30 @@
           buildInputs = lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
         };
 
-        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+        # Dependencies of the shipped binary (release profile, fat LTO). Only
+        # `cargo build` is needed here: clippy and tests use the `ci` profile.
+        cargoArtifacts = craneLib.buildDepsOnly (
+          commonArgs
+          // {
+            doCheck = false;
+            buildPhaseCargoCommand = "cargoWithProfile build --locked";
+          }
+        );
+
+        # Clippy and tests use the `ci` profile (release without LTO) so that
+        # every test binary doesn't go through a slow fat-LTO link.
+        ciArgs = commonArgs // {
+          CARGO_PROFILE = "ci";
+        };
+
+        ciCargoArtifacts = craneLib.buildDepsOnly ciArgs;
 
         laskugeneraattori = craneLib.buildPackage (
           commonArgs
           // {
             inherit cargoArtifacts;
+            # Tests run in the `laskugeneraattori-test` check instead
+            doCheck = false;
             GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
           }
         );
@@ -80,16 +98,18 @@
           inherit laskugeneraattori;
 
           laskugeneraattori-clippy = craneLib.cargoClippy (
-            commonArgs
+            ciArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = ciCargoArtifacts;
+              doInstallCargoArtifacts = false;
             }
           );
 
           laskugeneraattori-test = craneLib.cargoTest (
-            commonArgs
+            ciArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = ciCargoArtifacts;
+              doInstallCargoArtifacts = false;
               GIT_COMMIT_SHA = toString (self.rev or self.dirtyRev or self.lastModified or "dirty");
               MAILGUN_URL = "https://api.eu.mailgun.net/v3/laskutus.tietokilta.fi/messages";
               MAILGUN_USER = "api";
@@ -104,6 +124,18 @@
 
         packages = {
           default = laskugeneraattori;
+          # Compiled dependencies. CI keeps a GC root to this so that they are
+          # the only thing saved to (and restored from) the Actions cache.
+          deps = pkgs.linkFarm "laskugeneraattori-deps" [
+            {
+              name = "release";
+              path = cargoArtifacts;
+            }
+            {
+              name = "ci";
+              path = ciCargoArtifacts;
+            }
+          ];
           docker = pkgs.dockerTools.buildLayeredImage {
             name = "laskugeneraattori";
             tag = "latest";

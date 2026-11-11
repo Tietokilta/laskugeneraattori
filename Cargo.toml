@@ -15,6 +15,11 @@ path = "src/main.rs"
 [profile.release]
 lto = true
 
+# Used by CI for clippy and tests: same as release, minus the slow fat-LTO link
+[profile.ci]
+inherits = "release"
+lto = "off"
+
 [features]
 default = []
 system_fonts = ["dep:fontdb"]
