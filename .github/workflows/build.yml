@@ -1,6 +1,9 @@
 name: CI
 on:
   push:
+    # Renovate branches live in this repository, so they would otherwise run twice. They are
+    # tested through their pull request, which is also what Renovate waits for to automerge.
+    branches-ignore: ["renovate/**"]
   pull_request:
   release:
     types: [published]
@@ -61,9 +64,11 @@ jobs:
           path: image.tar.gz
           compression-level: 0
           retention-days: 1
-      # Save even if the checks fail, as long as the dependencies built
+      # Save even if the checks fail, as long as the dependencies built. Not for Renovate PRs:
+      # every one of them changes a lock file, so its cache would be a one-off entry that only
+      # that PR can restore. They still restore main's cache.
       - name: Save Nix store cache
-        if: always() && steps.deps.outcome == 'success' && steps.cache.outputs.hit-primary-key != 'true'
+        if: always() && steps.deps.outcome == 'success' && steps.cache.outputs.hit-primary-key != 'true' && !startsWith(github.head_ref, 'renovate/')
         uses: nix-community/cache-nix-action/save@v7
         with:
           primary-key: ${{ steps.cache.outputs.primary-key }}

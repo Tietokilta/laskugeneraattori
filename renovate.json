@@ -1,6 +1,42 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":maintainLockFilesWeekly",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Helsinki",
+  "nix": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "flake.nix does not pin the inputs to a rev, so Renovate moves them only through lock file maintenance (nix flake update). Keep that apart from Cargo.lock, so that a broken nixos-unstable does not hold back the crates",
+      "matchManagers": ["nix"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "branchTopic": "flake-lock-maintenance",
+      "commitMessageAction": "Update flake inputs"
+    },
+    {
+      "description": "The Nix build gets the toolchain from rust-overlay, which knows a release only once flake.lock is past it: waiting 8 days leaves room for one weekly flake.lock update in between",
+      "matchManagers": ["rust-toolchain"],
+      "minimumReleaseAge": "8 days"
+    },
+    {
+      "description": "typst, typst-pdf and typst-assets only compile against the same release",
+      "matchPackageNames": ["typst", "typst-pdf", "typst-assets"],
+      "groupName": "typst"
+    },
+    {
+      "description": "Semver-compatible, also on 0.x. CI builds, lints and tests every PR before anything merges",
+      "matchUpdateTypes": ["patch", "digest", "lockFileMaintenance"],
+      "automerge": true
+    },
+    {
+      "description": "Minor bumps are compatible only from 1.0 on",
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "automerge": true
+    }
   ]
 }
