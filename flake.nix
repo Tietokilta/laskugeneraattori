@@ -5,8 +5,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     crane.url = "github:ipetkov/crane";
     flake-utils.url = "github:numtide/flake-utils";
-    fenix = {
-      url = "github:nix-community/fenix";
+    # Vendors the manifest of every Rust release, so rust-toolchain.toml can be bumped (by hand or
+    # by Renovate) without also updating a hash here
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     treefmt-nix = {
@@ -21,7 +23,7 @@
       nixpkgs,
       crane,
       flake-utils,
-      fenix,
+      rust-overlay,
       treefmt-nix,
       ...
     }:
@@ -30,17 +32,14 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ fenix.overlays.default ];
-        };
-
-        toolchain = fenix.packages.${system}.fromToolchainFile {
-          file = ./rust-toolchain.toml;
-          sha256 = "sha256-zC8E38iDVJ1oPIzCqTk/Ujo9+9kx9dXq7wAwPMpkpg0=";
+          overlays = [ (import rust-overlay) ];
         };
 
         lib = pkgs.lib;
 
-        craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+        craneLib = (crane.mkLib pkgs).overrideToolchain (
+          p: p.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml
+        );
 
         unfilteredRoot = ./.;
 
