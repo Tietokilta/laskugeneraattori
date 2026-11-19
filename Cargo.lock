@@ -300,7 +300,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "sonic-rs",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "toml",
 ]
 
@@ -363,7 +363,7 @@ dependencies = [
  "futures-util",
  "rust_decimal",
  "tempfile",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "tokio",
  "uuid",
 ]
@@ -396,7 +396,7 @@ checksum = "530e3f0d33605d26efd08ed67c70e6503ed4f7d6b38d51bbcae18d2ac540fee8"
 dependencies = [
  "either",
  "iban",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "time",
 ]
 
@@ -1154,7 +1154,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "typetag",
  "uuid",
 ]
@@ -2238,7 +2238,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tempfile",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "time",
  "tokio",
  "tower-http",
@@ -2360,7 +2360,7 @@ dependencies = [
  "rayon",
  "sha2",
  "stringprep",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "time",
  "ttf-parser 0.25.1",
  "weezl",
@@ -3412,7 +3412,7 @@ version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21918d6644020c6f6ef1993242989bf6d4952d2e025617744f184c02df51c356"
 dependencies = [
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3588,7 +3588,7 @@ dependencies = [
  "http",
  "mime",
  "rand 0.9.2",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3958,7 +3958,7 @@ dependencies = [
  "simdutf8",
  "sonic-number",
  "sonic-simd",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -4232,11 +4232,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
 dependencies = [
- "thiserror-impl 2.0.17",
+ "thiserror-impl 2.0.21",
 ]
 
 [[package]]
@@ -4252,13 +4252,13 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -4588,7 +4588,7 @@ dependencies = [
  "governor",
  "http",
  "pin-project",
- "thiserror 2.0.17",
+ "thiserror 2.0.21",
  "tonic",
  "tower",
  "tracing",
