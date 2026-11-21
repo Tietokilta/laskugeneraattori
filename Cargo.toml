@@ -67,7 +67,7 @@ typst = { version = "0.13.1" }
 typst-assets = { version = "0.14.0", features = ["fonts"] }
 typst-pdf = { version = "0.13.1" }
 utoipa = { version = "5.4.0", features = ["axum_extras"] }
-utoipa-axum = "0.2.0"
+utoipa-axum = "0.3.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }
 
 [dev-dependencies]
