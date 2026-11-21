@@ -28,7 +28,7 @@ system_fonts = ["dep:fontdb"]
 
 [dependencies]
 axum = { version = "0.8.6", features = ["macros", "multipart"] }
-axum-valid = { version = "0.24.0", features = [
+axum-valid = { version = "0.25.0", features = [
   "basic",
   "full_garde",
   "typed_multipart",
